@@ -21,7 +21,7 @@ Dependencies: numpy, matplotlib; optional: scipy, pandas, pytest.
 """
 
 from __future__ import annotations
-import argparse, json, os, datetime
+import argparse, json, os, datetime, sys
 from typing import List, Dict, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
@@ -235,8 +235,10 @@ if __name__ == "__main__":
                         help="Output directory")
 
     args = parser.parse_args()
+    abs_out = os.path.abspath(args.outdir)
 
     final_tbls = sweep_and_log(
         args.methods, args.depths, args.freqs,
-        args.seeds, args.epochs, args.outdir)
-    print(f"Results saved to {os.path.abspath(args.outdir)}")
+        args.seeds, args.epochs, abs_out)
+    print(f"Results saved to {abs_out}")
+    sys.exit(0)
