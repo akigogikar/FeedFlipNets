@@ -36,11 +36,36 @@ except ImportError:
 # 1. Dataset
 # -------------------------------------------------------------
 
-def make_dataset(freq: int, n: int = 200, seed: int = 42) -> Tuple[np.ndarray, np.ndarray]:
-    rng = np.random.default_rng(seed)
-    x = np.linspace(-1, 1, n).reshape(1, -1)
-    y_true = np.sin(freq * np.pi * x)
-    return x, y_true + 0.1 * rng.standard_normal(size=y_true.shape)
+def make_dataset(freq: int, n: int = 200, seed: int = 42, dataset: str | None = None) -> Tuple[np.ndarray, np.ndarray]:
+    """Return a toy sinusoid dataset or one loaded via ``datasets`` package."""
+    if dataset is None or dataset == "synthetic":
+        rng = np.random.default_rng(seed)
+        x = np.linspace(-1, 1, n).reshape(1, -1)
+        y_true = np.sin(freq * np.pi * x)
+        return x, y_true + 0.1 * rng.standard_normal(size=y_true.shape)
+
+    if dataset == "mnist":
+        from datasets import load_mnist
+
+        X_train, y_train, _, _ = load_mnist()
+        return X_train[0:1].T, y_train[0:1].astype(float).reshape(1, -1)
+
+    if dataset.startswith("ucr:"):
+        from datasets import load_ucr
+
+        name = dataset.split(":", 1)[1]
+        X_train, y_train, _, _ = load_ucr(name)
+        return X_train[0:1].T, y_train[0:1].astype(float).reshape(1, -1)
+
+    if dataset == "tinystories":
+        from datasets import load_tinystories
+
+        tokens = load_tinystories()
+        x = np.arange(len(tokens)).reshape(1, -1) / len(tokens)
+        y = np.array(tokens == tokens).astype(float).reshape(1, -1)
+        return x, y
+
+    raise ValueError(f"Unsupported dataset: {dataset}")
 
 # -------------------------------------------------------------
 # 2. Math helpers
@@ -82,8 +107,8 @@ def backprop_deltas(weights: List[np.ndarray], activs: List[np.ndarray], err: np
 # 4. Single‑run training (returns curve, auc, t01)
 # -------------------------------------------------------------
 
-def train_single(method: str, depth: int, freq: int, seed: int, epochs: int = 500) -> Tuple[List[float], float, int]:
-    X, Y = make_dataset(freq, seed)
+def train_single(method: str, depth: int, freq: int, seed: int, epochs: int = 500, dataset: str | None = None) -> Tuple[List[float], float, int]:
+    X, Y = make_dataset(freq, seed=seed, dataset=dataset)
     N = X.shape[1]
     np.random.seed(seed)
 
@@ -154,14 +179,15 @@ def ensure_dir(p: str):
 
 
 def sweep_and_log(methods: List[str], depths: List[int], freqs: List[int], seeds: range,
-                  epochs: int, outdir: str) -> Dict[str, np.ndarray]:
+                  epochs: int, outdir: str, dataset: str | None = None) -> Dict[str, np.ndarray]:
     ensure_dir(outdir)
     plots_dir = os.path.join(outdir,'plots'); ensure_dir(plots_dir)
 
     meta = {
         'timestamp': datetime.datetime.now().isoformat(),
         'methods': methods, 'depths': depths, 'freqs': freqs,
-        'seeds': list(seeds), 'epochs': epochs
+        'seeds': list(seeds), 'epochs': epochs,
+        'dataset': dataset or 'synthetic'
     }
     with open(os.path.join(outdir,'summary.json'),'w') as f:
         json.dump(meta,f,indent=2)
@@ -176,7 +202,7 @@ def sweep_and_log(methods: List[str], depths: List[int], freqs: List[int], seeds
             for k in freqs:
                 curves=[]
                 for s in seeds:
-                    curve, auc, t01 = train_single(m,d,k,s,epochs)
+                    curve, auc, t01 = train_single(m, d, k, s, epochs, dataset=dataset)
                     curves.append(curve)
                     np.save(os.path.join(outdir, f"curve_{m.replace(' ','_')}_d{d}_k{k}_seed{s}.npy"), np.array(curve))
                 mean_curve = np.mean(curves, axis=0)
@@ -217,6 +243,7 @@ def sweep_and_log(methods: List[str], depths: List[int], freqs: List[int], seeds
     return final_tbls
 
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run ternary DFA sweep")
     parser.add_argument("--methods", nargs="+", default=[
@@ -240,3 +267,4 @@ if __name__ == "__main__":
         args.methods, args.depths, args.freqs,
         args.seeds, args.epochs, args.outdir)
     print(f"Results saved to {os.path.abspath(args.outdir)}")
+
