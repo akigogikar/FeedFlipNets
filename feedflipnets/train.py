@@ -129,7 +129,7 @@ def sweep_and_log(methods: List[str], depths: List[int], freqs: List[int], seeds
         plt.ylabel('Depth')
         plt.title(f'Final MSE — {m}')
         plt.tight_layout()
-        plt.savefig(os.path.join(plots_dir, f"heat_{m.replace(' ','_')}.png"), dpi=150)
+        plt.savefig(os.path.join(plots_dir, f"heat_{m.replace(' ','_')}.svg"))
         plt.close()
 
         # convergence curves grid per method
@@ -141,7 +141,7 @@ def sweep_and_log(methods: List[str], depths: List[int], freqs: List[int], seeds
         plt.title(f'Mean curves — {m}')
         plt.legend(ncol=2, fontsize=8)
         plt.tight_layout()
-        plt.savefig(os.path.join(plots_dir, f"curves_{m.replace(' ','_')}.png"), dpi=150)
+        plt.savefig(os.path.join(plots_dir, f"curves_{m.replace(' ','_')}.svg"))
         plt.close()
 
     return final_tbls

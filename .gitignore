@@ -1,2 +1,6 @@
 __pycache__/
 tests/__pycache__/
+# Ignore large experiment artifacts
+results/**/*.npy
+results/**/*.png
+!results/simple/plots/*.svg

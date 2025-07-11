@@ -8,7 +8,7 @@ Bug-fix snapshot (v8.1 ➜ v8.2)
 2. `sweep_and_log` now always returns final tables (regression test added).
 3. Added **unit test** `test_sweep_returns_tables` to catch NameError / SyntaxError.
 4. Plotting helper now generates **mean convergence curves** for *each* depth-freq pair
-   in a single figure for deeper analysis (`curves_<method>.png`).
+   in a single figure for deeper analysis (`curves_<method>.svg`).
 
 Run example
 -----------
