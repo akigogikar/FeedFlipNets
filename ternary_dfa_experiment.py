@@ -21,7 +21,7 @@ Dependencies: numpy, matplotlib; optional: scipy, pandas, pytest.
 """
 
 from __future__ import annotations
-import argparse, json, os, datetime
+import argparse, json, os, datetime, sys
 from typing import List, Dict, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
@@ -209,4 +209,36 @@ def sweep_and_log(methods: List[str], depths: List[int], freqs: List[int], seeds
         for (d,k), mc in mean_curves.items():
             plt.plot(mc, label=f'd{d}-k{k}')
         plt.xlabel('Epoch'); plt.ylabel('MSE'); plt.title(f'Mean curves — {m}')
-        plt.legend(ncol=2, fontsize=8); plt.tight
+        plt.legend(ncol=2, fontsize=8)
+        plt.tight_layout()
+        plt.savefig(os.path.join(plots_dir, f"curves_{m.replace(' ','_')}.png"), dpi=150)
+        plt.close()
+
+    return final_tbls
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run ternary DFA sweep")
+    parser.add_argument("--methods", nargs="+", default=[
+        "Backprop", "Vanilla DFA", "Structured DFA",
+        "Momentum", "Ternary adaptive + cal"],
+        help="Training methods to evaluate")
+    parser.add_argument("--depths", nargs="+", type=int, required=True,
+                        help="Network depths")
+    parser.add_argument("--freqs", nargs="+", type=int, required=True,
+                        help="Input frequencies")
+    parser.add_argument("--seeds", nargs="+", type=int, default=[0],
+                        help="Random seeds")
+    parser.add_argument("--epochs", type=int, default=500,
+                        help="Training epochs")
+    parser.add_argument("--outdir", type=str, default="results",
+                        help="Output directory")
+
+    args = parser.parse_args()
+    abs_out = os.path.abspath(args.outdir)
+
+    final_tbls = sweep_and_log(
+        args.methods, args.depths, args.freqs,
+        args.seeds, args.epochs, abs_out)
+    print(f"Results saved to {abs_out}")
+    sys.exit(0)
