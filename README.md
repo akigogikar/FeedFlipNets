@@ -1,5 +1,6 @@
 # FeedFlipNets
 
+
 FeedFlipNets is a minimal research code base exploring "flip" style feedback in neural networks. The project accompanies the FeedFlipNets paper and provides reference implementations for running small‐scale experiments with direct feedback alignment (DFA) and quantized weights.
 
 The repository currently contains a single script `ternary_dfa_experiment.py` which sweeps over network depth and training frequency on a toy time‑series regression problem. Additional scripts (not included here) were used in the paper to benchmark the approach on MNIST and the TinyStories language dataset.
@@ -50,4 +51,5 @@ To reproduce the main benchmarks from the paper:
 2. Run the time‑series sweep command to match the regression results.
 3. Repeat for MNIST and TinyStories using the respective dataset options or scripts.
 4. Compare the final tables and plots in the `results/*/` folders with the ones reported in the paper.
+
 
