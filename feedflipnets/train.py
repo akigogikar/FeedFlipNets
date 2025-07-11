@@ -11,7 +11,11 @@ from .models import forward_pass, backprop_deltas
 
 
 def train_single(method: str, depth: int, freq: int, seed: int, epochs: int = 500) -> Tuple[List[float], float, int]:
-    X, Y = make_dataset(freq, seed)
+    # second argument of ``make_dataset`` is the number of points; the previous
+    # implementation mistakenly passed ``seed`` here which resulted in empty
+    # datasets when ``seed`` was 0.  Explicitly bind the keyword to avoid such
+    # mixups.
+    X, Y = make_dataset(freq, seed=seed)
     N = X.shape[1]
     np.random.seed(seed)
 
