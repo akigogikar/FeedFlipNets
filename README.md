@@ -1,6 +1,19 @@
 # FeedFlipNets
 
 
+This repository provides minimal implementations of FeedFlipNets utilities.
+Core modules live under `feedflipnets/` and experiment scripts under
+`experiments/`.
+
+Run the example experiment (package layout):
+
+```bash
+python experiments/ternary_dfa_experiment.py --depths 1 2 --freqs 1 3
+```
+
+The legacy entry point `python ternary_dfa_experiment.py` continues to work and
+forwards to the script under `experiments/`.
+
 FeedFlipNets is a minimal research code base exploring "flip" style feedback in neural networks. The project accompanies the FeedFlipNets paper and provides reference implementations for running small‐scale experiments with direct feedback alignment (DFA) and quantized weights.
 
 The repository currently contains a single script `ternary_dfa_experiment.py` which sweeps over network depth and training frequency on a toy time‑series regression problem. Additional scripts (not included here) were used in the paper to benchmark the approach on MNIST and the TinyStories language dataset.
