@@ -243,7 +243,6 @@ def sweep_and_log(methods: List[str], depths: List[int], freqs: List[int], seeds
     return final_tbls
 
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run ternary DFA sweep")
     parser.add_argument("--methods", nargs="+", default=[
