@@ -11,6 +11,25 @@ Run the example experiment (package layout):
 python experiments/ternary_dfa_experiment.py --depths 1 2 --freqs 1 3
 ```
 
+Running the command with the default 500 epochs produces the following
+final mean squared error (MSE) table (method `Backprop`), stored under
+`results/simple`:
+
+| depth/freq | 1 | 3 |
+|-----------:|---:|---:|
+| 1 | 0.1321 | 0.4936 |
+| 2 | 0.1224 | 0.4883 |
+
+Example plots:
+
+![Heatmap](results/simple/plots/heat_Backprop.svg)
+
+![Convergence curves](results/simple/plots/curves_Backprop.svg)
+
+See `results/simple/plots` for the generated heatmap and convergence curves.
+Heavy binary artifacts are not stored. The example images are lightweight
+SVG files for reference.
+
 The legacy entry point `python ternary_dfa_experiment.py` continues to work and
 forwards to the script under `experiments/`.
 
