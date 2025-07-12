@@ -1,4 +1,4 @@
-import os, sys, pathlib
+import os, sys, pathlib, json
 import pytest
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
@@ -36,3 +36,16 @@ def test_sweep_returns_tables(tmp_path):
     assert isinstance(tables, dict)
     assert 'Backprop' in tables
     assert tables['Backprop'].shape == (1, 1)
+
+
+def test_sweep_generator_seeds(tmp_path):
+    gen = (i for i in range(2))
+    tables = sweep_and_log([
+        'Backprop'], [1], [1], gen, epochs=1, outdir=str(tmp_path), dataset="synthetic"
+    )
+    assert isinstance(tables, dict)
+    assert os.path.exists(os.path.join(tmp_path, 'curve_Backprop_d1_k1_seed0.npy'))
+    assert os.path.exists(os.path.join(tmp_path, 'curve_Backprop_d1_k1_seed1.npy'))
+    with open(os.path.join(tmp_path, 'summary.json')) as f:
+        meta = json.load(f)
+    assert meta['seeds'] == [0, 1]
