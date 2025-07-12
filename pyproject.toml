@@ -13,7 +13,8 @@ authors = [{ name = "Researcher" }]
 dependencies = [
     "numpy",
     "matplotlib",
-    "pandas"
+    "pandas",
+    "scikit-learn"
 ]
 
 [project.optional-dependencies]

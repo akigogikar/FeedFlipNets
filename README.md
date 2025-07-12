@@ -69,6 +69,24 @@ python ternary_dfa_experiment.py --depths 1 2 4 --freqs 1 3 5 --epochs 300 --out
 python ternary_dfa_experiment.py --dataset mnist --depths 2 4 --epochs 20 --outdir results/mnist
 ```
 
+### Small MNIST example
+
+This repository includes a short run used for testing the dataset loader.  It
+trains for a single epoch on depth 1 with three methods:
+
+```
+python ternary_dfa_experiment.py --dataset mnist --depths 1 --freqs 1 \
+    --epochs 1 --outdir results/mnist-mini --methods Backprop "Vanilla DFA" Momentum
+```
+
+The final mean squared error after one epoch is approximately:
+
+| method       |  MSE |
+|--------------|----:|
+| Backprop     | 26.1 |
+| Vanilla DFA  | 25.9 |
+| Momentum     | 25.9 |
+
 ### TinyStories sweep
 
 ```

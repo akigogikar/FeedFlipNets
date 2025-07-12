@@ -1,0 +1,19 @@
+{
+  "timestamp": "2025-07-11T14:15:36.731457",
+  "methods": [
+    "Backprop",
+    "Vanilla DFA",
+    "Momentum"
+  ],
+  "depths": [
+    1
+  ],
+  "freqs": [
+    1
+  ],
+  "seeds": [
+    0
+  ],
+  "epochs": 1,
+  "dataset": "mnist"
+}

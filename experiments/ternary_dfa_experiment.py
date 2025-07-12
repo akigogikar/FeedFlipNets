@@ -40,13 +40,23 @@ def parse_args() -> argparse.Namespace:
     p.add_argument('--epochs', type=int, default=500)
     p.add_argument('--outdir', type=str, default='results')
     p.add_argument('--seeds', type=int, nargs='+', default=[0])
+    p.add_argument('--dataset', type=str, default=None,
+                   help='Dataset to use (mnist, tinystories or ucr:<name>)')
     return p.parse_args()
 
 
 def main(args: argparse.Namespace | None = None) -> None:
     if args is None:
         args = parse_args()
-    sweep_and_log(args.methods, args.depths, args.freqs, args.seeds, args.epochs, args.outdir)
+    sweep_and_log(
+        args.methods,
+        args.depths,
+        args.freqs,
+        args.seeds,
+        args.epochs,
+        args.outdir,
+        dataset=args.dataset,
+    )
 
 
 if __name__ == '__main__':

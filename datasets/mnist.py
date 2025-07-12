@@ -21,8 +21,8 @@ def load_mnist(path: str = _DEF_PATH) -> Tuple[np.ndarray, np.ndarray, np.ndarra
     from sklearn.datasets import fetch_openml  # local import to avoid hard dependency
 
     mnist = fetch_openml("mnist_784", version=1)
-    X = mnist.data.astype(np.float32) / 255.0
-    y = mnist.target.astype(int)
+    X = mnist.data.to_numpy().astype(np.float32) / 255.0
+    y = mnist.target.astype(int).to_numpy()
     X = normalize(X, axis=0)
     X_train, X_test = X[:60000], X[60000:]
     y_train, y_test = y[:60000], y[60000:]
