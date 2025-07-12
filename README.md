@@ -8,7 +8,8 @@ Core modules live under `feedflipnets/` and experiment scripts under
 Run the example experiment (package layout):
 
 ```bash
-python experiments/ternary_dfa_experiment.py --depths 1 2 --freqs 1 3
+python experiments/ternary_dfa_experiment.py --depths 1 2 --freqs 1 3 \
+    --outdir results/simple
 ```
 
 Running the command with the default 500 epochs produces the following
