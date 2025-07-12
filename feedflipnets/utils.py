@@ -4,7 +4,13 @@ from typing import Tuple
 import numpy as np
 
 
-def make_dataset(freq: int, n: int = 200, seed: int = 42, dataset: str | None = None) -> Tuple[np.ndarray, np.ndarray]:
+def make_dataset(
+    freq: int,
+    n: int = 200,
+    seed: int = 42,
+    dataset: str | None = None,
+    max_points: int | None = None,
+) -> Tuple[np.ndarray, np.ndarray]:
     """Return a toy sinusoid or a small slice from one of the datasets.
 
     Parameters
@@ -20,11 +26,15 @@ def make_dataset(freq: int, n: int = 200, seed: int = 42, dataset: str | None = 
         Name of a dataset to load. Supported options are ``"mnist"``,
         ``"tinystories"`` and strings of the form ``"ucr:<name>"``.  If ``None``
         or ``"synthetic"`` the toy sinusoid is returned.
+    max_points
+        Optional limit on the number of points returned. Useful for quick
+        smoke tests.
     """
 
     if dataset is None or dataset == "synthetic":
         rng = np.random.default_rng(seed)
-        x = np.linspace(-1, 1, n).reshape(1, -1)
+        n_points = min(n, max_points) if max_points is not None else n
+        x = np.linspace(-1, 1, n_points).reshape(1, -1)
         y_true = np.sin(freq * np.pi * x)
         return x, y_true + 0.1 * rng.standard_normal(size=y_true.shape)
 
@@ -34,7 +44,10 @@ def make_dataset(freq: int, n: int = 200, seed: int = 42, dataset: str | None = 
         X_train, y_train, _, _ = load_mnist()
         # use a single digit as a sequence of pixel values to keep the toy
         # network's one-dimensional input interface
-        return X_train[0].reshape(1, -1), y_train[0:1].astype(float).reshape(1, -1)
+        x = X_train[0].reshape(1, -1)
+        if max_points is not None:
+            x = x[:, :max_points]
+        return x, y_train[0:1].astype(float).reshape(1, -1)
 
     if dataset.startswith("ucr:"):
         from datasets import load_ucr
@@ -42,12 +55,17 @@ def make_dataset(freq: int, n: int = 200, seed: int = 42, dataset: str | None = 
         name = dataset.split(":", 1)[1]
         X_train, y_train, _, _ = load_ucr(name)
         # treat the first time-series as a one-dimensional signal
-        return X_train[0].reshape(1, -1), y_train[0:1].astype(float).reshape(1, -1)
+        x = X_train[0].reshape(1, -1)
+        if max_points is not None:
+            x = x[:, :max_points]
+        return x, y_train[0:1].astype(float).reshape(1, -1)
 
     if dataset == "tinystories":
         from datasets import load_tinystories
 
         tokens = load_tinystories()
+        if max_points is not None:
+            tokens = tokens[:max_points]
         x = np.arange(len(tokens)).reshape(1, -1) / len(tokens)
         y = np.array(tokens == tokens).astype(float).reshape(1, -1)
         return x, y

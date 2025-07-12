@@ -15,6 +15,11 @@ def test_make_dataset_explicit_dataset():
     assert X.shape == (1, 5)
     assert Y.shape == (1, 5)
 
+def test_make_dataset_limit():
+    X, Y = make_dataset(freq=1, n=10, seed=0, dataset="synthetic", max_points=3)
+    assert X.shape == (1, 3)
+    assert Y.shape == (1, 3)
+
 def test_make_dataset_mnist_shape():
     try:
         X, Y = make_dataset(freq=1, dataset="mnist")

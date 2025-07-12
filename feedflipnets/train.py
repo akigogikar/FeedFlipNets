@@ -24,6 +24,7 @@ def train_single(
     seed: int,
     epochs: int = 500,
     dataset: str | None = None,
+    max_points: int | None = None,
 ) -> Tuple[List[float], float, int]:
     """Train a single network instance and return metrics."""
 
@@ -31,7 +32,7 @@ def train_single(
     # implementation mistakenly passed ``seed`` here which resulted in empty
     # datasets when ``seed`` was 0.  Explicitly bind the keyword to avoid such
     # mixups.
-    X, Y = make_dataset(freq, seed=seed, dataset=dataset)
+    X, Y = make_dataset(freq, seed=seed, dataset=dataset, max_points=max_points)
     N = X.shape[1]
     np.random.seed(seed)
 
@@ -149,6 +150,7 @@ def sweep_and_log(
     epochs: int,
     outdir: str,
     dataset: str | None = None,
+    max_points: int | None = None,
 ) -> Dict[str, np.ndarray]:
     ensure_dir(outdir)
     plots_dir = os.path.join(outdir, 'plots')
@@ -162,6 +164,7 @@ def sweep_and_log(
         'seeds': list(seeds),
         'epochs': epochs,
         'dataset': dataset or 'synthetic',
+        'max_points': max_points,
     }
     with open(os.path.join(outdir, 'summary.json'), 'w') as f:
         json.dump(meta, f, indent=2)
@@ -178,7 +181,15 @@ def sweep_and_log(
             for k in freqs:
                 curves = []
                 for s in seeds:
-                    curve, _, _ = train_single(m, d, k, s, epochs, dataset)
+                    curve, _, _ = train_single(
+                        m,
+                        d,
+                        k,
+                        s,
+                        epochs,
+                        dataset,
+                        max_points,
+                    )
                     curves.append(curve)
                     np.save(os.path.join(outdir, f"curve_{m.replace(' ','_')}_d{d}_k{k}_seed{s}.npy"), np.array(curve))
                 mean_curve = np.mean(curves, axis=0)

@@ -42,6 +42,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument('--seeds', type=int, nargs='+', default=[0])
     p.add_argument('--dataset', type=str, default=None,
                    help='Dataset to use (mnist, tinystories or ucr:<name>)')
+    p.add_argument('--max-points', type=int, default=None,
+                   help='Limit dataset to this many points for quick runs')
     return p.parse_args()
 
 
@@ -56,6 +58,7 @@ def main(args: argparse.Namespace | None = None) -> None:
         args.epochs,
         args.outdir,
         dataset=args.dataset,
+        max_points=args.max_points,
     )
 
 
