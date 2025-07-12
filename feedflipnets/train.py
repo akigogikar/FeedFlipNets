@@ -115,6 +115,8 @@ def train_single(
             Ws[-1] = quantize_stoch(W_new, alpha * np.mean(np.abs(W_new)))
 
         delta_dfa = err
+        if block_ortho and delta_dfa.shape[0] == 1:
+            delta_dfa = np.repeat(delta_dfa, hidden_dim, axis=0)
         for l in reversed(range(depth)):
             pseudo = B[l] @ delta_dfa
             W_for_grad = shadow_Ws[l] if use_shadow else Ws[l]
