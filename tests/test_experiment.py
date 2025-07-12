@@ -1,4 +1,4 @@
-import os, sys, pathlib
+import os, sys, pathlib, json
 import pytest
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
@@ -30,6 +30,16 @@ def test_make_dataset_mnist_shape():
     assert Y.shape == (1, 1)
 
 
+@pytest.mark.parametrize("ds", ["mnist", "tinystories", "ucr:GunPoint"])
+def test_make_dataset_downloadables(ds):
+    try:
+        X, Y = make_dataset(freq=1, dataset=ds, max_points=3)
+    except Exception:
+        pytest.skip(f"{ds} dataset not available")
+    assert X.shape == (1, 3)
+    assert Y.shape == (1, 3)
+
+
 def test_sweep_returns_tables(tmp_path):
     tables = sweep_and_log(
         ['Backprop'], [1], [1], range(1), epochs=2, outdir=str(tmp_path), dataset="synthetic"
@@ -37,6 +47,7 @@ def test_sweep_returns_tables(tmp_path):
     assert isinstance(tables, dict)
     assert 'Backprop' in tables
     assert tables['Backprop'].shape == (1, 1)
+
 
 
 @pytest.mark.parametrize(
@@ -65,3 +76,16 @@ def test_train_single_all_modes(method):
     )
     assert isinstance(curve, list)
     assert len(curve) == 1
+
+def test_sweep_generator_seeds(tmp_path):
+    gen = (i for i in range(2))
+    tables = sweep_and_log([
+        'Backprop'], [1], [1], gen, epochs=1, outdir=str(tmp_path), dataset="synthetic"
+    )
+    assert isinstance(tables, dict)
+    assert os.path.exists(os.path.join(tmp_path, 'curve_Backprop_d1_k1_seed0.npy'))
+    assert os.path.exists(os.path.join(tmp_path, 'curve_Backprop_d1_k1_seed1.npy'))
+    with open(os.path.join(tmp_path, 'summary.json')) as f:
+        meta = json.load(f)
+    assert meta['seeds'] == [0, 1]
+

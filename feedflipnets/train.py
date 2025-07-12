@@ -158,12 +158,14 @@ def sweep_and_log(
     plots_dir = os.path.join(outdir, 'plots')
     ensure_dir(plots_dir)
 
+    seeds = list(seeds)
+
     meta = {
         'timestamp': datetime.datetime.now().isoformat(),
         'methods': methods,
         'depths': depths,
         'freqs': freqs,
-        'seeds': list(seeds),
+        'seeds': seeds,
         'epochs': epochs,
         'dataset': dataset or 'synthetic',
         'max_points': max_points,
