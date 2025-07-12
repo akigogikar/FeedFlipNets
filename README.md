@@ -58,10 +58,18 @@ python ternary_dfa_experiment.py --depths <d1 d2 ...> --freqs <f1 f2 ...> --epoc
 
 This will train networks for the specified depths and frequencies, store curves and summary tables under `<results_dir>` and produce plots in `<results_dir>/plots`.
 
+Datasets from the UCR/UEA archive can be specified via `--dataset ucr:<name>`.
+
 ### Time‑series example
 
 ```
 python ternary_dfa_experiment.py --depths 1 2 4 --freqs 1 3 5 --epochs 300 --outdir results/timeseries
+```
+
+### UCR/UEA example
+
+```bash
+python ternary_dfa_experiment.py --dataset ucr:GunPoint --depths 1 --freqs 1 --epochs 10 --max-points 50 --outdir results/gunpoint
 ```
 
 ### MNIST sweep
