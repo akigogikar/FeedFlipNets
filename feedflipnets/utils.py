@@ -47,6 +47,9 @@ def make_dataset(
         x = X_train[0].reshape(1, -1)
         if max_points is not None:
             x = x[:, :max_points]
+            y = y_train[0:1].astype(float).reshape(1, 1)
+            y = np.repeat(y, x.shape[1], axis=1)
+            return x, y
         return x, y_train[0:1].astype(float).reshape(1, -1)
 
     if dataset.startswith("ucr:"):
@@ -58,6 +61,9 @@ def make_dataset(
         x = X_train[0].reshape(1, -1)
         if max_points is not None:
             x = x[:, :max_points]
+            y = y_train[0:1].astype(float).reshape(1, 1)
+            y = np.repeat(y, x.shape[1], axis=1)
+            return x, y
         return x, y_train[0:1].astype(float).reshape(1, -1)
 
     if dataset == "tinystories":

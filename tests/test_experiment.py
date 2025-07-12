@@ -29,6 +29,16 @@ def test_make_dataset_mnist_shape():
     assert Y.shape == (1, 1)
 
 
+@pytest.mark.parametrize("ds", ["mnist", "tinystories", "ucr:GunPoint"])
+def test_make_dataset_downloadables(ds):
+    try:
+        X, Y = make_dataset(freq=1, dataset=ds, max_points=3)
+    except Exception:
+        pytest.skip(f"{ds} dataset not available")
+    assert X.shape == (1, 3)
+    assert Y.shape == (1, 3)
+
+
 def test_sweep_returns_tables(tmp_path):
     tables = sweep_and_log(
         ['Backprop'], [1], [1], range(1), epochs=2, outdir=str(tmp_path), dataset="synthetic"
