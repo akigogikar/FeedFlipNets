@@ -3,6 +3,7 @@ import pytest
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
 from ternary_dfa_experiment import make_dataset, sweep_and_log
+from feedflipnets.train import train_single
 
 
 def test_make_dataset_shape():
@@ -48,6 +49,34 @@ def test_sweep_returns_tables(tmp_path):
     assert tables['Backprop'].shape == (1, 1)
 
 
+
+@pytest.mark.parametrize(
+    "method",
+    [
+        "Backprop",
+        "Vanilla DFA",
+        "Structured DFA",
+        "Ternary static \u0394",
+        "Ternary + adaptive + ortho B",
+        "Ternary + adaptive + ortho B + cal",
+        "+Shadow",
+        "+Momentum",
+        "Ternary DFA on Transformer/LLM",
+    ],
+)
+def test_train_single_all_modes(method):
+    curve, _, _ = train_single(
+        method,
+        depth=1,
+        freq=1,
+        seed=0,
+        epochs=1,
+        dataset="synthetic",
+        max_points=5,
+    )
+    assert isinstance(curve, list)
+    assert len(curve) == 1
+
 def test_sweep_generator_seeds(tmp_path):
     gen = (i for i in range(2))
     tables = sweep_and_log([
@@ -59,3 +88,4 @@ def test_sweep_generator_seeds(tmp_path):
     with open(os.path.join(tmp_path, 'summary.json')) as f:
         meta = json.load(f)
     assert meta['seeds'] == [0, 1]
+
