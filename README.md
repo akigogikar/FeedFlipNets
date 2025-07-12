@@ -80,6 +80,9 @@ python ternary_dfa_experiment.py --dataset mnist --depths 1 --freqs 1 \
     --epochs 1 --outdir results/mnist-mini --methods Backprop "Vanilla DFA" Momentum
 ```
 
+For a very quick smoke test you can further limit the dataset size with
+`--max-points <n>` which truncates the loaded sequence to ``n`` points.
+
 The final mean squared error after one epoch is approximately:
 
 | method       |  MSE |
