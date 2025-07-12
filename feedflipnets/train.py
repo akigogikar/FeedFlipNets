@@ -6,7 +6,14 @@ from typing import List, Dict, Tuple, Iterable
 import numpy as np
 import matplotlib.pyplot as plt
 
-from .utils import make_dataset, quantize_stoch, ensure_dir, tanh_deriv
+from .utils import (
+    make_dataset,
+    quantize_stoch,
+    quantize_fixed,
+    quantize_sign,
+    ensure_dir,
+    tanh_deriv,
+)
 from .models import forward_pass, backprop_deltas
 
 
@@ -31,24 +38,57 @@ def train_single(
     hidden_dim, lr, alpha = 8, 0.01, 0.7
     beta, calib_k = 0.9, 50
 
+    ortho_B_methods = {
+        "Structured DFA",
+        "Ternary + adaptive + ortho B",
+        "Ternary + adaptive + ortho B + cal",
+        "+Shadow",
+        "+Momentum",
+        "Ternary DFA on Transformer/LLM",
+    }
+    block_ortho = method == "Ternary DFA on Transformer/LLM"
+    calibrate = method in {"Ternary + adaptive + ortho B + cal", "Ternary DFA on Transformer/LLM"}
+    use_momentum = method == "+Momentum"
+    use_shadow = method == "+Shadow"
+
+    def init_B() -> List[np.ndarray]:
+        if method in ortho_B_methods:
+            Q, _ = np.linalg.qr(np.random.randn(hidden_dim, hidden_dim))
+            if block_ortho:
+                return [Q for _ in range(depth)]
+            return [Q[:, [i % hidden_dim]] for i in range(depth)]
+        B = [np.random.randn(hidden_dim, 1) for _ in range(depth)]
+        return [b / np.linalg.norm(b) for b in B]
+
     # ---- weight init ----
     Ws: List[np.ndarray] = []
     for d in range(depth):
         in_dim = 1 if d == 0 else hidden_dim
-        init = (np.random.randn(hidden_dim, in_dim) * 0.5 if method == "Backprop" else
-                 np.random.choice([-1.0, 0.0, 1.0], (hidden_dim, in_dim)))
+        init = (
+            np.random.randn(hidden_dim, in_dim) * 0.5
+            if method == "Backprop" or use_shadow
+            else np.random.choice([-1.0, 0.0, 1.0], (hidden_dim, in_dim))
+        )
         Ws.append(init.astype(float))
-    Ws.append((np.random.randn(1, hidden_dim) * 0.5 if method == "Backprop" else
-               np.random.choice([-1.0, 0.0, 1.0], (1, hidden_dim))).astype(float))
+    Ws.append(
+        (
+            np.random.randn(1, hidden_dim) * 0.5
+            if method == "Backprop" or use_shadow
+            else np.random.choice([-1.0, 0.0, 1.0], (1, hidden_dim))
+        ).astype(float)
+    )
 
-    B = [np.random.randn(hidden_dim, 1) for _ in range(depth)]
-    B = [b / np.linalg.norm(b) for b in B]
+    B = init_B()
     M = [np.zeros_like(w) for w in Ws]
+    shadow_Ws = [w.copy() for w in Ws] if use_shadow else None
 
     curve: List[float] = []
     t01_reached = epochs + 1
     for epoch in range(epochs):
-        acts = forward_pass(Ws, X)
+        if use_shadow:
+            acts = forward_pass([quantize_sign(w) for w in shadow_Ws], X)
+        else:
+            acts = forward_pass(Ws, X)
         err = acts[-1] - Y
         mse = float(np.mean(err ** 2))
         curve.append(mse)
@@ -63,22 +103,36 @@ def train_single(
 
         G_out = (err @ acts[-2].T) / N
         W_new = Ws[-1] - lr * G_out
-        Ws[-1] = W_new if method in {"Vanilla DFA", "Structured DFA"} else \
-                 quantize_stoch(W_new, alpha * np.mean(np.abs(W_new)))
+        if method in {"Vanilla DFA", "Structured DFA"}:
+            Ws[-1] = W_new
+        elif method == "Ternary static \u0394":
+            Ws[-1] = quantize_fixed(W_new)
+        elif use_shadow:
+            shadow_Ws[-1] -= lr * G_out
+            Ws[-1] = quantize_sign(shadow_Ws[-1])
+        else:
+            Ws[-1] = quantize_stoch(W_new, alpha * np.mean(np.abs(W_new)))
 
         delta_dfa = err
         for l in reversed(range(depth)):
             pseudo = B[l] @ delta_dfa
-            pseudo *= tanh_deriv(Ws[l] @ acts[l])
+            W_for_grad = shadow_Ws[l] if use_shadow else Ws[l]
+            pseudo *= tanh_deriv(W_for_grad @ acts[l])
             grad = (pseudo @ acts[l].T) / N
             if method in {"Vanilla DFA", "Structured DFA"}:
                 Ws[l] -= lr * grad
+            elif method == "Ternary static \u0394":
+                Ws[l] = quantize_fixed(Ws[l] - lr * grad)
             else:
-                Ws[l] = quantize_stoch(Ws[l] - lr * grad, alpha * np.mean(np.abs(Ws[l])))
-                if method == "Momentum":
-                    M[l] = beta * M[l] + (1 - beta) * grad
-                    Ws[l] = quantize_stoch(Ws[l] - lr * M[l], alpha * np.mean(np.abs(Ws[l])))
-            if method == "Ternary adaptive + cal" and epoch % calib_k == 0:
+                if use_shadow:
+                    shadow_Ws[l] -= lr * grad
+                    Ws[l] = quantize_sign(shadow_Ws[l])
+                else:
+                    Ws[l] = quantize_stoch(Ws[l] - lr * grad, alpha * np.mean(np.abs(Ws[l])))
+                    if use_momentum:
+                        M[l] = beta * M[l] + (1 - beta) * grad
+                        Ws[l] = quantize_stoch(Ws[l] - lr * M[l], alpha * np.mean(np.abs(Ws[l])))
+            if calibrate and epoch % calib_k == 0:
                 true_d = backprop_deltas(Ws, acts, err)[l]
                 Bl = (true_d @ delta_dfa.T) / (np.sum(delta_dfa ** 2) + 1e-8)
                 B[l] = Bl / (np.linalg.norm(Bl) + 1e-8)

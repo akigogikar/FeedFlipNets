@@ -102,4 +102,20 @@ To reproduce the main benchmarks from the paper:
 3. Repeat for MNIST and TinyStories using the respective dataset options or scripts.
 4. Compare the final tables and plots in the `results/*/` folders with the ones reported in the paper.
 
+## Experiment classes
+
+The repository supports a variety of feedback alignment and quantized training variants. The table below summarises the main options and their rough performance relative to full precision backpropagation:
+
+| Variant                            | Feedback    | Quantizer       | Calibration | Extras      | Rel. MSE↑ (%) / ΔAcc↓ (%) |
+| ---------------------------------- | ----------- | --------------- | ----------- | ----------- | ------------------------- |
+| FP Backprop (oracle)               | —           | FP              | —           | —           | 0                         |
+| Vanilla DFA (random)               | random      | FP              | —           | —           | +5–10                     |
+| Structured DFA (ortho)             | ortho       | FP              | —           | —           | +2–3                      |
+| Ternary static Δ                   | random      | fixed           | —           | —           | +400                      |
+| Ternary + adaptive Δ               | random      | adaptive+dither | —           | —           | +80                       |
+| Ternary + adaptive + ortho B       | ortho       | adaptive+dither | —           | —           | +30                       |
+| Ternary + adaptive + ortho B + cal | ortho       | adaptive+dither | Yes         | —           | **+5**                    |
+| +Shadow                            | ortho       | sign(P)         | —           | Shadow      | +15                       |
+| +Momentum                          | ortho       | adaptive+dither | —           | momentum    | *unstable*                |
+| **Ternary DFA on Transformer/LLM** | block-ortho | adaptive+dither | Yes         | Hybrid opt. | (TBD)                     |
 
