@@ -72,5 +72,18 @@ def quantize_stoch(W: np.ndarray, thr: float) -> np.ndarray:
     return out
 
 
+def quantize_fixed(W: np.ndarray, thr: float = 0.0) -> np.ndarray:
+    """Deterministic ternary quantization with a fixed threshold."""
+    out = np.zeros_like(W, dtype=float)
+    out[W > thr] = 1.0
+    out[W < -thr] = -1.0
+    return out
+
+
+def quantize_sign(W: np.ndarray) -> np.ndarray:
+    """Return the sign of ``W`` as {-1, 0, 1} floats."""
+    return np.sign(W).astype(float)
+
+
 def ensure_dir(p: str):
     os.makedirs(p, exist_ok=True)
