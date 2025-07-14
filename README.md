@@ -40,7 +40,8 @@ Available datasets:
 - `tinystories`
 - `ucr:<NAME>` from the UCR/UEA archive
 
-Downloads are cached in `datasets_cache/`.
+Datasets are stored under `datasets_cache/` after the first download.
+The directory is created automatically if it does not exist.
 
 ### Examples
 Run a small synthetic time-series sweep:
