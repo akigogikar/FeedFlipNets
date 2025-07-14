@@ -24,7 +24,9 @@ pip install -e .[dev]
 ```
 
 ## Getting Started
-Experiments are launched via `python experiments/ternary_dfa_experiment.py`. A wrapper script at the repository root (`ternary_dfa_experiment.py`) provides the same interface for backward compatibility. The general pattern is
+The recommended entry point is `python experiments/ternary_dfa_experiment.py`.
+A wrapper script at the repository root (`ternary_dfa_experiment.py`) offers the
+same interface for backward compatibility. The general pattern is
 
 ```bash
 python experiments/ternary_dfa_experiment.py --depths <d1 d2 ...> --freqs <f1 f2 ...> \
