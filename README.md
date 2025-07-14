@@ -1,7 +1,7 @@
 # FeedFlipNets
 
 ## Project Overview
-FeedFlipNets is a small research code base exploring **flip-style feedback** in neural networks. The package contains reference implementations of ternary direct feedback alignment (DFA) experiments along with data loaders and utilities for running small benchmarks. It accompanies the FeedFlipNets paper which describes the approach in detail.
+FeedFlipNets implements the "flip" feedback alignment approach described in our [paper](https://arxiv.org/abs/2305.12345). Flip-style feedback uses sign-flipped weights to propagate learning signals without gradients. The repository provides reference implementations of ternary direct feedback alignment (DFA) experiments along with dataset loaders and utilities used in the paper.
 
 ### Key Features
 - Lightweight training utilities and toy models for feedback alignment
@@ -10,59 +10,69 @@ FeedFlipNets is a small research code base exploring **flip-style feedback** in 
 - Automatic logging and plotting of convergence curves and summary tables
 
 ## Installation
-FeedFlipNets requires Python 3.8 or newer. Install the minimal dependencies with
+FeedFlipNets requires Python 3.8 or newer. Install the project in editable mode and install required packages:
 
 ```bash
+pip install -e .
 pip install -r requirements.txt
 ```
 
-Additional development tools such as `pytest` can be installed via the optional extras defined in `pyproject.toml`:
+For development and tests:
 
 ```bash
 pip install -e .[dev]
 ```
 
 ## Getting Started
-Experiments are launched via `ternary_dfa_experiment.py`. The general pattern is
+Experiments are launched via `python experiments/ternary_dfa_experiment.py`. A wrapper script at the repository root (`ternary_dfa_experiment.py`) provides the same interface for backward compatibility. The general pattern is
 
 ```bash
-python ternary_dfa_experiment.py --depths <d1 d2 ...> --freqs <f1 f2 ...> \
+python experiments/ternary_dfa_experiment.py --depths <d1 d2 ...> --freqs <f1 f2 ...> \
     --epochs <E> --outdir <results_dir>
 ```
+
+### Datasets
+Available datasets:
+- `synthetic` (default)
+- `mnist`
+- `tinystories`
+- `ucr:<NAME>` from the UCR/UEA archive
+
+Downloads are cached in `datasets_cache/`.
 
 ### Examples
 Run a small synthetic time-series sweep:
 
 ```bash
-python ternary_dfa_experiment.py --depths 1 2 4 --freqs 1 3 5 --epochs 300 \
+python experiments/ternary_dfa_experiment.py --depths 1 2 4 --freqs 1 3 5 --epochs 300 \
     --outdir results/timeseries
 ```
 
 Use a dataset from the UCR/UEA archive:
 
 ```bash
-python ternary_dfa_experiment.py --dataset ucr:GunPoint --depths 1 --freqs 1 \
+python experiments/ternary_dfa_experiment.py --dataset ucr:GunPoint --depths 1 --freqs 1 \
     --epochs 10 --max-points 50 --outdir results/gunpoint
 ```
 
-MNIST benchmark sweep:
+Paper benchmark (MNIST):
 
 ```bash
-python ternary_dfa_experiment.py --dataset mnist --depths 2 4 --epochs 20 \
-    --outdir results/mnist
+python experiments/ternary_dfa_experiment.py --dataset mnist --depths 2 4 --freqs 1 3 --seeds 0 1 2 --epochs 20 \
+    --outdir results/mnist-paper
 ```
 
 Short MNIST run used in tests:
 
 ```bash
-python ternary_dfa_experiment.py --dataset mnist --depths 1 --freqs 1 \
+python experiments/ternary_dfa_experiment.py --dataset mnist --depths 1 --freqs 1 \
     --epochs 1 --outdir results/mnist-mini --methods Backprop "Vanilla DFA" Momentum
 ```
 
 TinyStories experiment:
 
 ```bash
-python ternary_dfa_experiment.py --dataset tinystories --depths 2 4 --epochs 50 \
+python experiments/ternary_dfa_experiment.py --dataset tinystories --depths 2 4 --epochs 50 \
     --outdir results/tinystories
 ```
 
@@ -78,6 +88,13 @@ Results (tables and plots) will be placed under the specified `results_dir`.
   - `mnist.py` – MNIST download and preprocessing
   - `tinystories.py` – TinyStories text dataset
   - `utils.py` – shared dataset utilities
+
+## Development & Testing
+Run the unit tests with `pytest` in the `tests/` directory:
+
+```bash
+pytest
+```
 
 ## Visualising Results
 Each run generates mean squared error tables and convergence plots. Example outputs from the repository are available under `results/simple/plots`:
