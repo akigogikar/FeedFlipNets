@@ -90,7 +90,16 @@ Results (tables and plots) will be placed under the specified `results_dir`.
   - `utils.py` – shared dataset utilities
 
 ## Development & Testing
-Run the unit tests with `pytest` in the `tests/` directory:
+Optional development dependencies are listed in `pyproject.toml` under
+`[project.optional-dependencies].dev`. Install them with the project to enable
+testing:
+
+```bash
+pip install -e .[dev]
+```
+
+### Running the Tests
+Execute the unit tests from the repository root using `pytest`:
 
 ```bash
 pytest
