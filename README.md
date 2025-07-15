@@ -1,7 +1,17 @@
 # FeedFlipNets
 
 ## Project Overview
-FeedFlipNets implements the "flip" feedback alignment approach described in our [paper](https://arxiv.org/abs/2305.12345). Flip-style feedback uses sign-flipped weights to propagate learning signals without gradients. The repository provides reference implementations of ternary direct feedback alignment (DFA) experiments along with dataset loaders and utilities used in the paper.
+FeedFlipNets implements the "flip" feedback alignment approach described in our
+[paper](https://arxiv.org/abs/2305.12345). Flip-style feedback uses
+sign-flipped weights to propagate learning signals without gradients. Networks
+are trained with **ternary weights** – every weight is constrained to take
+values from {-1, 0, 1}. After each update the weights are quantised back to
+these discrete levels, either stochastically or deterministically depending on
+the chosen method. Dedicated feedback matrices project output errors directly to
+each layer (direct feedback alignment), allowing the ternary weights to
+"flip" between their discrete states while still receiving useful training
+signals. The repository provides reference implementations of these ternary DFA
+experiments along with dataset loaders and utilities used in the paper.
 
 ### Key Features
 - Lightweight training utilities and toy models for feedback alignment
