@@ -1,0 +1,15 @@
+===================================================== test session starts ======================================================
+platform linux -- Python 3.12.10, pytest-8.4.1, pluggy-1.6.0
+rootdir: /workspace/FeedFlipNets
+configfile: pyproject.toml
+collected 18 items
+
+tests/test_experiment.py .....ss...........                                                                              [100%]
+
+======================================================= warnings summary =======================================================
+tests/test_experiment.py: 12 warnings
+  /workspace/FeedFlipNets/feedflipnets/train.py:143: DeprecationWarning: `trapz` is deprecated. Use `trapezoid` instead, or one of the numerical integration functions in `scipy.integrate`.
+    auc = float(np.trapz(curve))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+========================================= 16 passed, 2 skipped, 12 warnings in 34.03s ==========================================

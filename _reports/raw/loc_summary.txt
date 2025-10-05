@@ -1,0 +1,12 @@
+<noext>: files=12 loc=71
+.csv: files=4 loc=9
+.idx: files=1 loc=54
+.json: files=2 loc=37
+.md: files=1 loc=129
+.pack: files=1 loc=579
+.py: files=13 loc=708
+.rev: files=1 loc=3
+.sample: files=14 loc=868
+.svg: files=8 loc=7324
+.toml: files=1 loc=24
+.txt: files=5 loc=102
