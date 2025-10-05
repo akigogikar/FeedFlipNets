@@ -1,0 +1,20 @@
+  Downloading idna-3.10-py3-none-any.whl.metadata (10 kB)
+Collecting urllib3<3,>=1.21.1 (from requests->cloc)
+  Downloading urllib3-2.5.0-py3-none-any.whl.metadata (6.5 kB)
+Collecting certifi>=2017.4.17 (from requests->cloc)
+  Downloading certifi-2025.10.5-py3-none-any.whl.metadata (2.5 kB)
+Downloading colored-2.3.1-py3-none-any.whl (19 kB)
+Downloading requests-2.32.5-py3-none-any.whl (64 kB)
+Downloading charset_normalizer-3.4.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (151 kB)
+Downloading idna-3.10-py3-none-any.whl (70 kB)
+Downloading urllib3-2.5.0-py3-none-any.whl (129 kB)
+Downloading certifi-2025.10.5-py3-none-any.whl (163 kB)
+Building wheels for collected packages: cloc
+  Building wheel for cloc (pyproject.toml): started
+  Building wheel for cloc (pyproject.toml): finished with status 'done'
+  Created wheel for cloc: filename=cloc-0.2.5-py3-none-any.whl size=17650 sha256=408bbd8681f7fc07022b55e82c46d49531cc295b6ebcd530629c9f5b5cfa6935
+  Stored in directory: /root/.cache/pip/wheels/7c/94/69/944dd7da622b7ad37c5963f145747689483fccee50c0591aa7
+Successfully built cloc
+Installing collected packages: urllib3, idna, colored, charset_normalizer, certifi, requests, cloc
+
+Successfully installed certifi-2025.10.5 charset_normalizer-3.4.3 cloc-0.2.5 colored-2.3.1 idna-3.10 requests-2.32.5 urllib3-2.5.0

@@ -1,0 +1,9 @@
+requirement_id,requirement_text,module_path,evidence_link,status,notes
+R1,Ternary feedback alignment training loop supporting multiple methods,feedflipnets/train.py,"feedflipnets/train.py#L20-L144",Covered,"Implements Backprop, DFA, ternary variants but tightly coupled to IO."
+R2,Sweep CLI for configuring depths/frequencies/seeds,experiments/ternary_dfa_experiment.py,"experiments/ternary_dfa_experiment.py#L1-L63",Covered,"CLI wraps sweep_and_log and exposes argparse entry point."
+R3,Dataset helpers for synthetic,MNIST,TinyStories,UCR,datasets/*.py;feedflipnets/utils.py,"feedflipnets/utils.py#L7-L79",Partial,"Synthetic path covered; remote loaders lack caching/offline controls."
+R4,Automatic logging and plotting of experiment results,feedflipnets/train.py,"feedflipnets/train.py#L163-L238",Covered,"Generates summary JSON, CSV, and plots but mixes concerns with training."
+R5,Reproducible automation/CI for tests and linting,.github,"_reports/raw/tree.txt#L1-L61",Missing,"No workflows present; manual validation only."
+R6,Documentation guiding installation and experiments,README.md,"README.md#L16-L128",Covered,"Provides install, dataset descriptions, and usage examples."
+R7,Non-functional requirement: offline-friendly dataset loading,datasets/utils.py,"datasets/utils.py#L12-L31",Missing,"Download helpers hit network each call without retries or cache manifest."
+R8,Observability/metrics export beyond plots,feedflipnets/train.py,"feedflipnets/train.py#L163-L238",Missing,"No structured metrics or logging beyond print statements and files."

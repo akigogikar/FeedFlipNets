@@ -1,0 +1,10 @@
+     55 
+     18 README.md
+      8 ternary_dfa_experiment.py
+      8 feedflipnets/train.py
+      6 tests/test_experiment.py
+      5 feedflipnets/utils.py
+      4 requirements.txt
+      4 experiments/ternary_dfa_experiment.py
+      3 datasets/mnist.py
+      3 .gitignore
