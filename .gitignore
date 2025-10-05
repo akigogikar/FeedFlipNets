@@ -5,3 +5,4 @@ results/**/*.npy
 results/**/*.png
 !results/simple/plots/*.svg
 datasets_cache/
+runs/

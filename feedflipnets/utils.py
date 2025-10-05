@@ -1,7 +1,19 @@
+"""Legacy utility shims for backwards compatibility."""
+
 from __future__ import annotations
-import os
+
+import warnings
+from pathlib import Path
 from typing import Tuple
+
 import numpy as np
+
+from .core.quantization import quantize_ternary_det, quantize_ternary_stoch, ternary
+from .data import registry
+from .data.loaders import mnist as _mnist  # noqa: F401
+from .data.loaders import synthetic as _synthetic  # noqa: F401
+from .data.loaders import tinystories as _tinystories  # noqa: F401
+from .data.loaders import ucr_uea as _ucr  # noqa: F401
 
 
 def make_dataset(
@@ -11,70 +23,46 @@ def make_dataset(
     dataset: str | None = None,
     max_points: int | None = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Return a toy sinusoid or a small slice from one of the datasets.
-
-    Parameters
-    ----------
-    freq : int
-        Frequency of the synthetic sinusoid when ``dataset`` is ``None`` or
-        ``"synthetic"``.
-    n : int, optional
-        Number of points for the synthetic dataset, by default 200.
-    seed : int, optional
-        Random seed for noise generation, by default 42.
-    dataset : str | None, optional
-        Name of a dataset to load. Supported options are ``"mnist"``,
-        ``"tinystories"`` and strings of the form ``"ucr:<name>"``.  If ``None``
-        or ``"synthetic"`` the toy sinusoid is returned.
-    max_points
-        Optional limit on the number of points returned. Useful for quick
-        smoke tests.
-    """
+    """Compat shim that mirrors the historic ``make_dataset`` behaviour."""
 
     if dataset is None or dataset == "synthetic":
         rng = np.random.default_rng(seed)
         n_points = min(n, max_points) if max_points is not None else n
-        x = np.linspace(-1, 1, n_points).reshape(1, -1)
+        x = np.linspace(-1, 1, n_points, dtype=np.float32).reshape(1, -1)
         y_true = np.sin(freq * np.pi * x)
-        return x, y_true + 0.1 * rng.standard_normal(size=y_true.shape)
+        return x, y_true + 0.05 * rng.standard_normal(size=y_true.shape)
 
     if dataset == "mnist":
-        from datasets import load_mnist
-
-        X_train, y_train, _, _ = load_mnist()
-        # use a single digit as a sequence of pixel values to keep the toy
-        # network's one-dimensional input interface
-        x = X_train[0].reshape(1, -1)
+        spec = registry.get_dataset("mnist", subset="train", max_items=max_points or 1, one_hot=False)
+        batch = next(spec.loader("train", 1))
+        x = batch.inputs[0:1]
         if max_points is not None:
             x = x[:, :max_points]
-            y = y_train[0:1].astype(float).reshape(1, 1)
-            y = np.repeat(y, x.shape[1], axis=1)
-            return x, y
-        return x, y_train[0:1].astype(float).reshape(1, -1)
+        label = float(batch.targets[0, 0])
+        y = np.full((1, x.shape[1] if max_points else 1), label, dtype=np.float32)
+        return x, y
 
-    if dataset.startswith("ucr:"):
-        from datasets import load_ucr
-
+    if dataset and dataset.startswith("ucr:"):
         name = dataset.split(":", 1)[1]
-        X_train, y_train, _, _ = load_ucr(name)
-        # treat the first time-series as a one-dimensional signal
-        x = X_train[0].reshape(1, -1)
+        spec = registry.get_dataset("ucr_uea", name=name)
+        batch = next(spec.loader("train", 1))
+        x = batch.inputs[0:1]
         if max_points is not None:
             x = x[:, :max_points]
-            y = y_train[0:1].astype(float).reshape(1, 1)
-            y = np.repeat(y, x.shape[1], axis=1)
-            return x, y
-        return x, y_train[0:1].astype(float).reshape(1, -1)
+        target = float(np.argmax(batch.targets[0]))
+        y = np.full((1, x.shape[1]), target, dtype=np.float32)
+        return x, y
 
     if dataset == "tinystories":
-        from datasets import load_tinystories
-
-        tokens = load_tinystories()
+        spec = registry.get_dataset("tinystories")
+        batch = next(spec.loader("train", 1))
+        x = batch.inputs[0:1]
         if max_points is not None:
-            tokens = tokens[:max_points]
-        x = np.arange(len(tokens)).reshape(1, -1) / len(tokens)
-        y = np.array(tokens == tokens).astype(float).reshape(1, -1)
-        return x, y
+            x = x[:, :max_points]
+        y = batch.targets[0:1].T
+        if max_points is not None:
+            y = np.repeat(y[:, :1], x.shape[1], axis=1)
+        return x, y.astype(np.float32)
 
     raise ValueError(f"Unsupported dataset: {dataset}")
 
@@ -88,26 +76,21 @@ def tanh_deriv(x: np.ndarray) -> np.ndarray:
 
 
 def quantize_stoch(W: np.ndarray, thr: float) -> np.ndarray:
-    noise = np.random.uniform(-thr, thr, W.shape)
-    Wn = W + noise
-    out = np.zeros_like(W, dtype=float)
-    out[Wn > thr] = 1.0
-    out[Wn < -thr] = -1.0
-    return out
+    warnings.warn("Use feedflipnets.core.quantization.quantize_ternary_stoch instead", DeprecationWarning)
+    rng = np.random.default_rng()
+    return quantize_ternary_stoch(W, thr, rng)
 
 
 def quantize_fixed(W: np.ndarray, thr: float = 0.0) -> np.ndarray:
-    """Deterministic ternary quantization with a fixed threshold."""
-    out = np.zeros_like(W, dtype=float)
-    out[W > thr] = 1.0
-    out[W < -thr] = -1.0
-    return out
+    warnings.warn("Use feedflipnets.core.quantization.quantize_ternary_det instead", DeprecationWarning)
+    return quantize_ternary_det(W, thr)
 
 
 def quantize_sign(W: np.ndarray) -> np.ndarray:
-    """Return the sign of ``W`` as {-1, 0, 1} floats."""
-    return np.sign(W).astype(float)
+    warnings.warn("Use feedflipnets.core.quantization.ternary instead", DeprecationWarning)
+    return ternary(W)
 
 
-def ensure_dir(p: str):
-    os.makedirs(p, exist_ok=True)
+def ensure_dir(path: str | Path) -> None:
+    Path(path).mkdir(parents=True, exist_ok=True)
+
