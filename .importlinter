@@ -1,0 +1,21 @@
+[importlinter]
+root_package = feedflipnets
+
+[importlinter:core_isolation]
+name = Core cannot depend on higher layers
+type = forbidden
+source_modules =
+    feedflipnets.core
+forbidden_modules =
+    feedflipnets.data
+    feedflipnets.training
+    feedflipnets.reporting
+
+[importlinter:data_isolation]
+name = Data layer independent of training/reporting
+type = forbidden
+source_modules =
+    feedflipnets.data
+forbidden_modules =
+    feedflipnets.training
+    feedflipnets.reporting

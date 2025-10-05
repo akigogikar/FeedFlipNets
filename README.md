@@ -1,129 +1,127 @@
 # FeedFlipNets
 
 ## Project Overview
-FeedFlipNets implements the "flip" feedback alignment approach described in our
-[paper](https://arxiv.org/abs/2305.12345). Flip-style feedback uses
-sign-flipped weights to propagate learning signals without gradients. Networks
-are trained with **ternary weights** – every weight is constrained to take
-values from {-1, 0, 1}. After each update the weights are quantised back to
-these discrete levels, either stochastically or deterministically depending on
-the chosen method. Dedicated feedback matrices project output errors directly to
-each layer (direct feedback alignment), allowing the ternary weights to
-"flip" between their discrete states while still receiving useful training
-signals. The repository provides reference implementations of these ternary DFA
-experiments along with dataset loaders and utilities used in the paper.
+FeedFlipNets implements "flip" feedback alignment: networks update ternary weights
+in {-1, 0, 1} while projecting output errors to hidden layers with fixed feedback
+matrices. The vNext architecture splits the project into well-defined packages so
+that training strategies, datasets and reporting utilities can be combined
+modularly. Deterministic pipelines and offline fixtures make the experiments
+reproducible without network access.
 
-### Key Features
-- Lightweight training utilities and toy models for feedback alignment
-- Built-in experiment script for sweeping network depth and update frequency
-- Dataset helpers for synthetic time-series, MNIST, TinyStories and UCR/UEA archives
-- Automatic logging and plotting of convergence curves and summary tables
+### Key Capabilities
+- **Core primitives** – pure NumPy activations, ternary quantisation helpers and
+  feedback-alignment strategies.
+- **Data layer** – cache-first dataset registry with offline shards for MNIST,
+  TinyStories and UCR/UEA samples.
+- **Training pipelines** – configurable trainer that applies post-update
+  quantisation and pluggable feedback strategies.
+- **Reporting** – JSONL metrics sink, optional headless-safe plotting and run
+  manifests with git/version metadata.
 
 ## Installation
-FeedFlipNets requires Python 3.8 or newer. Install the project in editable mode and install required packages:
+FeedFlipNets targets Python 3.10+. The dependency lock file is the single source
+of truth:
+
+```bash
+pip install -r requirements-lock.txt
+```
+
+For editable installs:
 
 ```bash
 pip install -e .
-pip install -r requirements.txt
 ```
 
-For development and tests:
+## Run Modes
+FeedFlipNets is designed for automation-first, reproducible runs. The following
+modes are supported:
+
+- **Offline datasets** – set `FEEDFLIP_DATA_OFFLINE=1` to force loaders to use
+  bundled fixtures. No network access is attempted in this mode.
+- **Headless plotting** – plotting is disabled by default. Enable it per run with
+  `"enable_plots": true` in the training config or `--enable-plots` once exposed.
+- **Deterministic metrics** – fixed seeds plus deterministic JSONL timestamps
+  ensure repeated runs produce identical first 20 metric entries (within 1e-7).
+- **Structured feedback** – orthogonal, Hadamard, block-diagonal and low-rank
+  feedback matrices are reproducible under fixed seeds; refresh policies
+  (`fixed`, `per_step`, `per_epoch`) control when matrices are regenerated.
+
+## Quickstart
+Experiments are executed through the unified CLI:
 
 ```bash
-pip install -e .[dev]
+python -m cli.main --preset synthetic-min
 ```
 
-## Getting Started
-The recommended entry point is `python experiments/ternary_dfa_experiment.py`.
-A wrapper script at the repository root (`ternary_dfa_experiment.py`) offers the
-same interface for backward compatibility. The general pattern is
+Available presets:
 
-```bash
-python experiments/ternary_dfa_experiment.py --depths <d1 d2 ...> --freqs <f1 f2 ...> \
-    --epochs <E> --outdir <results_dir>
-```
+- `synthetic-min` – 200 deterministic steps on an in-memory sinusoid.
+- `mnist-flip-det` – flip-strategy ternary run using the MNIST fixture.
+- `tinystories-dfa-stoch` – DFA strategy with stochastic ternary quantisation.
+- `synthetic-structured-orthogonal-fixed` – structured feedback with fixed
+  orthogonal refresh on a medium synthetic dataset.
+- `synthetic-structured-hadamard-perstep` – Hadamard-structured feedback that
+  regenerates per step for a stochastic baseline.
+- `depth-frequency-sweep` – automation wrapper that reuses the new pipeline for
+  depth/update-frequency sweeps.
 
-### Datasets
-Available datasets:
-- `synthetic` (default)
-- `mnist`
-- `tinystories`
-- `ucr:<NAME>` from the UCR/UEA archive
+Run details are written to `runs/<preset>/` (or a custom `run_dir`). The JSONL
+metrics file contains `{step, ts, metric_name: value}` entries; the manifest in
+the same directory records the git SHA, dataset provenance and seeds.
 
-Datasets are stored under `datasets_cache/` after the first download.
-The directory is created automatically if it does not exist.
+## Module Map
+The repository is organised as follows:
 
-### Examples
-Run a small synthetic time-series sweep:
-
-```bash
-python experiments/ternary_dfa_experiment.py --depths 1 2 4 --freqs 1 3 5 --epochs 300 \
-    --outdir results/timeseries
-```
-
-Use a dataset from the UCR/UEA archive:
-
-```bash
-python experiments/ternary_dfa_experiment.py --dataset ucr:GunPoint --depths 1 --freqs 1 \
-    --epochs 10 --max-points 50 --outdir results/gunpoint
-```
-
-Paper benchmark (MNIST):
-
-```bash
-python experiments/ternary_dfa_experiment.py --dataset mnist --depths 2 4 --freqs 1 3 --seeds 0 1 2 --epochs 20 \
-    --outdir results/mnist-paper
-```
-
-Short MNIST run used in tests:
-
-```bash
-python experiments/ternary_dfa_experiment.py --dataset mnist --depths 1 --freqs 1 \
-    --epochs 1 --outdir results/mnist-mini --methods Backprop "Vanilla DFA" Momentum
-```
-
-TinyStories experiment:
-
-```bash
-python experiments/ternary_dfa_experiment.py --dataset tinystories --depths 2 4 --epochs 50 \
-    --outdir results/tinystories
-```
-
-Results (tables and plots) will be placed under the specified `results_dir`.
-
-## Module Guide
-- `feedflipnets/` contains the core implementation:
-  - `models.py` – simple feed-forward models and backprop utilities
-  - `train.py` – training loop and experiment orchestration
-  - `utils.py` – activation functions and helper routines
-- `datasets/` provides loaders for several datasets:
-  - `timeseries.py` – interface to the UCR/UEA archive
-  - `mnist.py` – MNIST download and preprocessing
-  - `tinystories.py` – TinyStories text dataset
-  - `utils.py` – shared dataset utilities
+- `feedflipnets/core/`
+  - `types.py` – shared type aliases and `FeedbackStrategy` protocol.
+  - `activations.py` – pure NumPy activations (e.g. ReLU, Hadamard padding).
+  - `quantization.py` – ternary helpers including deterministic and stochastic
+    quantisers.
+  - `feedback.py` – DFA, flip-feedback, structured matrices and backprop-lite
+    implementations.
+- `feedflipnets/data/`
+  - `cache_manager.py` – cache.fetch with offline fixtures, checksum validation
+    and retries.
+  - `registry.py` – dataset registry returning `DatasetSpec` objects with
+    provenance metadata.
+  - `loaders/` – synthetic, MNIST, TinyStories and UCR/UEA loaders that operate
+    offline-first.
+- `feedflipnets/training/`
+  - `trainer.py` – core training loop applying feedback strategies and ternary
+    quantisation.
+  - `pipelines.py` – assembles data, model configs, reporting adapters and
+    exposes presets.
+- `feedflipnets/reporting/`
+  - `metrics.py` – JSONL sink with deterministic timestamps.
+  - `plots.py` – optional matplotlib plotting gated behind `enable_plots`.
+  - `artifacts.py` – manifest writer capturing git SHA, seeds and dataset
+    fingerprints.
+- `cli/main.py` – single entrypoint CLI orchestrating presets and overrides.
+- `feedflipnets/train.py` – deprecated shim that forwards legacy calls to the
+  new pipeline and emits a deprecation warning.
 
 ## Development & Testing
-Optional development dependencies are listed in `pyproject.toml` under
-`[project.optional-dependencies].dev`. Install them with the project to enable
-testing:
+Convenience targets are provided via `make`:
 
 ```bash
-pip install -e .[dev]
+make setup      # install dependencies
+make test       # run unit tests
+make lint       # run import-linter contracts
+make smoke      # smoke test synthetic preset
 ```
 
-### Running the Tests
-Execute the unit tests from the repository root using `pytest`:
+Manual commands:
 
 ```bash
+pip install -r requirements-lock.txt
 pytest
+lint-imports
+python -m cli.main --preset synthetic-min
 ```
 
-## Visualising Results
-Each run generates mean squared error tables and convergence plots. Example outputs from the repository are available under `results/simple/plots`:
+Set `FEEDFLIP_DATA_OFFLINE=1` in CI or local shells to ensure offline fixtures
+are used. The CLI defaults to headless mode, so matplotlib is only imported when
+plots are explicitly enabled.
 
-![Heatmap](results/simple/plots/heat_Backprop.svg)
-
-![Convergence curves](results/simple/plots/curves_Backprop.svg)
-
-## Reference and License
-For the full methodology see the accompanying FeedFlipNets research paper. This repository is released under the terms of the MIT License; see the `LICENSE` file for details.
+## Reference & License
+FeedFlipNets is released under the MIT License. See `LICENSE` for details.

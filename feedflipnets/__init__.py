@@ -1,17 +1,22 @@
-from .utils import (
-    make_dataset,
-    tanh,
-    tanh_deriv,
-    quantize_stoch,
-    quantize_fixed,
-    quantize_sign,
-    ensure_dir,
-)
-from .models import forward_pass, backprop_deltas
-from .train import train_single, sweep_and_log
+"""FeedFlipNets public API."""
+
+from .core import activations, feedback, quantization, types  # noqa: F401
+from .training.pipelines import load_preset, presets, run_pipeline
+from .training.trainer import Trainer
+from .train import sweep_and_log, train_single
+from .utils import make_dataset
 
 __all__ = [
-    'make_dataset', 'tanh', 'tanh_deriv', 'quantize_stoch',
-    'quantize_fixed', 'quantize_sign', 'ensure_dir',
-    'forward_pass', 'backprop_deltas', 'train_single', 'sweep_and_log'
+    "Trainer",
+    "activations",
+    "feedback",
+    "quantization",
+    "types",
+    "load_preset",
+    "presets",
+    "run_pipeline",
+    "train_single",
+    "sweep_and_log",
+    "make_dataset",
 ]
+
