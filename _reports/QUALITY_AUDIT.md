@@ -1,47 +1,40 @@
-# Quality & Risk Audit
+# Quality & Risk Audit – FeedFlipNets v1.0 Snapshot
 
-## Test & Tooling Snapshot
-- **Pytest**: 16 passed, 2 skipped in ~34s; deprecation warnings for `np.trapz` remain.【F:_reports/raw/pytest.txt†L1-L20】
-- **Code Size**: ~708 LOC of Python tracked by quick LOC scan; significant CSV/SVG artifacts also present.【F:_reports/raw/loc_summary.txt†L1-L12】
-- **Hotspots**: Training loop and README dominate history churn, signalling unstable requirements vs. implementation.【F:_reports/raw/hotspots.txt†L1-L10】
+## Tooling & Coverage
+- **Automation:** `.github/workflows/ci.yml` runs linting, tests with coverage
+  ≥75%, and the deterministic smoke preset on Python 3.10/3.11, uploading the
+  generated artefacts.【F:.github/workflows/ci.yml†L1-L33】
+- **Commands:** `Makefile` exposes `bootstrap`, `lint`, `test`, and `smoke`
+  targets; lint bundles Ruff, Black, and import-linter contracts while tests run
+  offline with `pytest --cov` and a fail-under gate.【F:Makefile†L1-L23】
+- **Determinism:** Contract tests assert that repeated pipeline executions yield
+  identical JSONL metrics, and the CLI smoke test ensures offline completion.
+  【F:tests/contract/test_trainer_contract.py†L1-L52】【F:tests/integration/test_cli.py†L1-L11】
 
-## Risk Register
-### Justification Block – Monolithic Trainer
-- **Finding:** `train_single` handles data prep, trainer state, logging, and quantisation within one function.【F:feedflipnets/train.py†L20-L144】  
-- **Why it matters:** Hard to test and extend new training strategies; invites bugs when experimenting.  
-- **Recommendation:** Refactor into trainer class + strategy interfaces (Phase 2).  
-- **Owner Suggestion:** Research engineering lead.
+## Residual Risks & Mitigations
+- **Offline cache integrity** – `feedflipnets.data.cache.fetch` records
+  provenance (mode, checksum, URL) via the `CacheManifest`. Risk of stale
+  fixtures mitigated by deterministic builders and manifest writes before
+  returning.【F:feedflipnets/data/cache.py†L1-L132】
+- **Strategy refresh semantics** – `StructuredFeedback` relies on the trainer to
+  flag `pending_refresh` metadata each epoch; contract tests cover gradient
+  shapes but additional stress tests on large hidden stacks remain TODO.【F:feedflipnets/core/strategies.py†L1-L207】
+- **Legacy usage** – `feedflipnets/train.py` now delegates to pipelines and emits
+  deprecation warnings, but downstream notebooks should migrate to the CLI to
+  benefit from deterministic artefacts.【F:feedflipnets/train.py†L1-L156】
 
-### Justification Block – Plotting Coupling
-- **Finding:** Matplotlib figure generation executed inside sweep loop with no headless guard.【F:feedflipnets/train.py†L203-L238】  
-- **Why it matters:** Headless servers and CI may fail or slow down runs; plotting can't be skipped.  
-- **Recommendation:** Move plotting into optional reporter service with CLI flag.  
-- **Owner Suggestion:** Tooling engineer.
+## Observability & Artefacts
+- Metrics sinks emit JSONL (`{step, split, loss, accuracy, seed, sha}`) and CSV
+  records, while `PlotAdapter` forces Matplotlib's Agg backend to remain
+  headless.【F:feedflipnets/reporting/metrics.py†L1-L63】【F:feedflipnets/reporting/plots.py†L1-L33】
+- `write_manifest` captures git SHA, config, dataset provenance (including
+  checksums), and environment flags; smoke artefacts are archived in CI for
+  regression triage.【F:feedflipnets/reporting/artifacts.py†L1-L33】【F:.github/workflows/ci.yml†L24-L33】
 
-### Justification Block – Network-Dependent Datasets
-- **Finding:** Dataset loaders call `download_file` on every request without retry/offline logic.【F:datasets/utils.py†L12-L31】【F:datasets/tinystories.py†L17-L25】  
-- **Why it matters:** CI flakes and ToS risks; no cache manifests for provenance.  
-- **Recommendation:** Build dataset registry with manifest + offline test fixtures (Phase 1).
-
-### Justification Block – Missing CI/CD
-- **Finding:** `.github` lacks workflows; no automated gates.【F:_reports/raw/tree.txt†L1-L61】  
-- **Why it matters:** Regression risk and inconsistent environments.  
-- **Recommendation:** Add GitHub Actions running lint/pytest + caching dataset fixtures.
-
-### Justification Block – Dependency Drift
-- **Finding:** Requirements split between `pyproject.toml` and `requirements.txt` with unpinned versions.【F:pyproject.toml†L6-L24】【F:requirements.txt†L1-L6】  
-- **Why it matters:** Reproducibility suffers; environment mismatches likely.  
-- **Recommendation:** Consolidate under Poetry/pip-tools lockfile and document supported versions (Phase 1).
-
-### Justification Block – Observability Gap
-- **Finding:** Metrics limited to print statements and saved plots; no structured logs or metadata beyond JSON summary.【F:feedflipnets/train.py†L163-L238】  
-- **Why it matters:** Difficult to compare runs programmatically or integrate with experiment trackers.  
-- **Recommendation:** Introduce metrics emitter interface (e.g., CSV/JSONL) in Phase 2.
-
-## Security & Compliance Notes
-- Remote dataset downloads use plain HTTP for UCR archive.【F:datasets/timeseries.py†L12-L41】 – risk of MITM; prefer HTTPS mirror or checksums.
-- No secret management issues detected (no `.env` or API keys present). Unknown CVE status due to lack of dependency locking.
-
-## Developer Experience
-- README provides install/run instructions but lacks "first run" script or Makefile.【F:README.md†L22-L118】
-- Tests cover primary flows yet rely on live network; add fixtures/mocks for deterministic onboarding.
+## Follow-up Actions
+- Expand structured-feedback regression tests to cover `hadamard`/`lowrank`
+  refresh policies under deeper networks.
+- Evaluate provenance signing for cached datasets if external distribution is
+  required.
+- Monitor CI wall-clock time; smoke artefact compression is currently best
+  effort (`tar` stage tolerates missing outputs).

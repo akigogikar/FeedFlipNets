@@ -6,6 +6,7 @@ import numpy as np
 
 from .types import Array
 
+
 def ternary(x: Array) -> Array:
     """Return the sign of ``x`` as ternary floats."""
 
@@ -24,7 +25,9 @@ def quantize_ternary_det(weights: Array, tau: float) -> Array:
     return out
 
 
-def quantize_ternary_stoch(weights: Array, tau: float, rng: np.random.Generator) -> Array:
+def quantize_ternary_stoch(
+    weights: Array, tau: float, rng: np.random.Generator
+) -> Array:
     """Stochastic ternary quantisation matching the legacy behaviour."""
 
     noise = rng.uniform(-tau, tau, size=weights.shape)
@@ -39,4 +42,3 @@ def pack_ternary(weights: Array) -> np.ndarray:
     """Pack ternary weights into ``int8`` vectors for logging or storage."""
 
     return ternary(weights).astype(np.int8)
-

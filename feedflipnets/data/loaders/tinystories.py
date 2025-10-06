@@ -8,11 +8,11 @@ from typing import Iterator
 import numpy as np
 
 from ...core.types import Batch
-from ..cache_manager import fetch
+from ..cache import fetch
 from ..registry import DatasetSpec, register_dataset
 
 _URL = "https://huggingface.co/datasets/roneneldan/TinyStories"
-_CHECKSUM = "fb7e21f9a172717ecc3f4664ef3a0bcb0ed20a7daab8471e394239c1414584ed"
+_CHECKSUM = "a78da77ff36f30c5e6a4467348b5f683afde3787e243be00b9340c306c8ad3fc"
 
 
 def _build_offline_fixture(path: Path) -> None:
@@ -40,20 +40,31 @@ def _build_offline_fixture(path: Path) -> None:
             "sleep",
             "<eos>",
         ],
-        dtype=object,
     )
     np.save(path, tokens)
 
 
-def _factory(window: int = 4, seed: int = 0, **options: object) -> DatasetSpec:
-    del options
+def _factory(
+    window: int = 4,
+    seed: int = 0,
+    *,
+    offline: bool = True,
+    cache_dir: str | Path | None = None,
+    **_: object,
+) -> DatasetSpec:
+    base_cache = Path(cache_dir) if cache_dir is not None else Path(".cache/feedflip")
+    offline_path = base_cache / "offline" / "tinystories_fixture.npy"
     path, provenance = fetch(
-        _URL,
+        name="tinystories",
+        url=_URL,
         checksum=_CHECKSUM,
         filename="tinystories_fixture.npy",
+        offline_path=offline_path,
         offline_builder=_build_offline_fixture,
+        offline=offline,
+        cache_dir=cache_dir,
     )
-    tokens = np.load(path, allow_pickle=True)
+    tokens = np.load(path, allow_pickle=False)
     vocab = {tok: idx for idx, tok in enumerate(sorted(set(tokens)))}
     encoded = np.array([vocab[t] for t in tokens], dtype=np.float32)
     encoded /= max(len(vocab), 1)
@@ -77,8 +88,12 @@ def _factory(window: int = 4, seed: int = 0, **options: object) -> DatasetSpec:
 
     provenance = dict(provenance)
     provenance.update({"window": window, "vocab_size": len(vocab)})
-    return DatasetSpec(name="tinystories", provenance=provenance, loader=loader)
+    return DatasetSpec(
+        name="tinystories",
+        provenance=provenance,
+        loader=loader,
+        checksum=provenance.get("checksum"),
+    )
 
 
 register_dataset("tinystories", _factory)
-

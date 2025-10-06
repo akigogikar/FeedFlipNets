@@ -25,6 +25,9 @@ class PlotAdapter:
     def close(self) -> None:
         if not self.enable_plots or not self._history:
             return
+        import matplotlib
+
+        matplotlib.use("Agg", force=True)
         import matplotlib.pyplot as plt  # imported lazily for headless safety
 
         steps, losses = zip(*self._history)
@@ -38,4 +41,3 @@ class PlotAdapter:
         plt.close(fig)
 
     __call__ = on_step
-

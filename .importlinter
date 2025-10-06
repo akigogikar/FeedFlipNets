@@ -19,3 +19,12 @@ source_modules =
 forbidden_modules =
     feedflipnets.training
     feedflipnets.reporting
+
+[importlinter:reporting_isolation]
+name = Reporting layer must not depend on data/training
+type = forbidden
+source_modules =
+    feedflipnets.reporting
+forbidden_modules =
+    feedflipnets.training
+    feedflipnets.data

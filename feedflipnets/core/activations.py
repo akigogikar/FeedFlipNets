@@ -28,4 +28,3 @@ def hadamard_pre(x: Array) -> Array:
     pad_shape = [(0, 0)] * x.ndim
     pad_shape[-1] = (0, pad_width)
     return np.pad(x, pad_shape, mode="constant") / np.sqrt(next_pow / size)
-

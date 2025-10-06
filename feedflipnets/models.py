@@ -11,10 +11,14 @@ def forward_pass(weights: List[np.ndarray], x: np.ndarray) -> List[np.ndarray]:
     return activs
 
 
-def backprop_deltas(weights: List[np.ndarray], activs: List[np.ndarray], err: np.ndarray) -> List[np.ndarray]:
-    L = len(weights) - 1
-    deltas: List[np.ndarray] = [None] * (L + 1)
-    deltas[L] = err
-    for l in reversed(range(L)):
-        deltas[l] = (weights[l + 1].T @ deltas[l + 1]) * tanh_deriv(weights[l] @ activs[l])
+def backprop_deltas(
+    weights: List[np.ndarray], activs: List[np.ndarray], err: np.ndarray
+) -> List[np.ndarray]:
+    last_layer = len(weights) - 1
+    deltas: List[np.ndarray] = [None] * (last_layer + 1)
+    deltas[last_layer] = err
+    for layer_idx in reversed(range(last_layer)):
+        deltas[layer_idx] = (
+            weights[layer_idx + 1].T @ deltas[layer_idx + 1]
+        ) * tanh_deriv(weights[layer_idx] @ activs[layer_idx])
     return deltas

@@ -5,4 +5,3 @@ from .metrics import JsonlSink
 from .plots import PlotAdapter
 
 __all__ = ["write_manifest", "JsonlSink", "PlotAdapter"]
-

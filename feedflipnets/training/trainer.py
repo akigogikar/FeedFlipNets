@@ -1,17 +1,25 @@
-"""Training loops for FeedFlipNets."""
+"""Deterministic training loops for FeedFlipNets."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Callable, Dict, Iterable, Iterator, Mapping, MutableMapping, Sequence
+import random
+from dataclasses import dataclass, field
+from typing import Iterable, Mapping, MutableSequence, Sequence
 
 import numpy as np
 
 from ..core.activations import relu
-from ..core.quantization import quantize_ternary_det, quantize_ternary_stoch
-from ..core.types import Array, Batch, FeedbackStrategy, RunResult
-
-Callback = Callable[[int, Mapping[str, float]], None]
+from ..core.quant import quantize_ternary_det, quantize_ternary_stoch
+from ..core.strategies import FeedbackStrategy
+from ..core.types import (
+    ActivationState,
+    Array,
+    Batch,
+    Gradients,
+    ModelDescription,
+    RunResult,
+    StrategyState,
+)
 
 
 def _relu_deriv(z: Array) -> Array:
@@ -19,98 +27,163 @@ def _relu_deriv(z: Array) -> Array:
 
 
 @dataclass
-class Trainer:
-    """Orchestrates optimisation using feedback alignment strategies."""
+class FeedForwardModel:
+    """Lightweight feed-forward network with ternary quantisation."""
 
-    @staticmethod
-    def run(
-        config: Mapping[str, object],
-        data_iter: Iterator[Batch],
-        callbacks: Sequence[Callback] | None = None,
-    ) -> RunResult:
-        callbacks = list(callbacks or [])
-        model_cfg = config.get("model", {})  # type: ignore[assignment]
-        train_cfg = config.get("train", {})  # type: ignore[assignment]
-        strategy: FeedbackStrategy = config["strategy"]  # type: ignore[index]
+    layer_dims: Sequence[int]
+    tau: float
+    quant: str = "det"
+    seed: int = 0
+    weights: MutableSequence[Array] = field(init=False, repr=False)
 
-        d_in = int(model_cfg.get("d_in", 1))
-        d_out = int(model_cfg.get("d_out", 1))
-        hidden = list(model_cfg.get("hidden", [32]))  # type: ignore[call-arg]
-        dims = [d_in, *hidden, d_out]
+    def __post_init__(self) -> None:
+        self.reset(self.seed)
 
-        seed = int(train_cfg.get("seed", 0))
-        steps = int(train_cfg.get("steps", 0))
-        lr = float(train_cfg.get("lr", 0.01))
-        tau = float(model_cfg.get("tau", 0.05))
-        quant_kind = model_cfg.get("quant", "det")
-        eval_interval = int(train_cfg.get("eval_interval", steps or 1))
-        if eval_interval <= 0:
-            eval_interval = 1
+    def describe(self) -> ModelDescription:
+        return ModelDescription(layer_dims=list(self.layer_dims))
 
-        metrics_path = config.get("metrics_path", "metrics.jsonl")  # type: ignore[assignment]
-        manifest_path = config.get("manifest_path", "manifest.json")  # type: ignore[assignment]
-
+    def reset(self, seed: int) -> None:
         rng = np.random.default_rng(seed)
-        quant_rng = np.random.default_rng(seed + 1)
-
+        self._quant_rng = np.random.default_rng(seed + 1)
         weights: list[Array] = []
+        dims = list(self.layer_dims)
         for in_dim, out_dim in zip(dims[:-1], dims[1:]):
             W = rng.standard_normal((in_dim, out_dim), dtype=np.float32) * 0.05
             weights.append(W)
+        self.weights = weights
 
-        # Prepare data iterator
-        iterator = data_iter
+    def forward(self, inputs: Array) -> tuple[Array, ActivationState]:
+        layer_inputs: list[Array] = [inputs]
+        layer_derivs: list[Array] = []
+        x = inputs
+        for idx, W in enumerate(self.weights):
+            z = x @ W
+            if idx < len(self.weights) - 1:
+                layer_derivs.append(_relu_deriv(z))
+                x = relu(z)
+                layer_inputs.append(x)
+            else:
+                x = z
+        activations = ActivationState(
+            layer_inputs=layer_inputs,
+            layer_derivs=layer_derivs,
+            weights=[w.copy() for w in self.weights],
+        )
+        return x, activations
 
-        for step in range(steps):
-            try:
-                batch = next(iterator)
-            except StopIteration:
-                iterator = iter(data_iter)
-                batch = next(iterator)
+    def apply_gradients(self, grads: Gradients) -> None:
+        for idx, W in enumerate(self.weights):
+            grad = grads.get(f"W{idx}")
+            if grad is None:
+                continue
+            self.weights[idx] = W + grad
 
-            activations: Dict[str, Array | list[Array]] = {}
-            layer_inputs: list[Array] = []
-            layer_derivs: list[Array] = []
-            x = batch.inputs
-            layer_inputs.append(x)
-            for idx, W in enumerate(weights):
-                z = x @ W
-                if idx < len(weights) - 1:
-                    layer_derivs.append(_relu_deriv(z))
-                    x = relu(z)
-                else:
-                    x = z
-                if idx < len(weights) - 1:
-                    layer_inputs.append(x)
-            activations["weights"] = [w.copy() for w in weights]
-            activations["layer_inputs"] = layer_inputs
-            activations["layer_derivs"] = layer_derivs
+    def quantise(self) -> None:
+        for idx, W in enumerate(self.weights):
+            if self.quant == "det":
+                self.weights[idx] = quantize_ternary_det(W, self.tau)
+            elif self.quant == "stoch":
+                self.weights[idx] = quantize_ternary_stoch(W, self.tau, self._quant_rng)
+            else:
+                raise ValueError(f"Unknown quantisation mode: {self.quant}")
 
-            predictions = x
-            error = predictions - batch.targets
-            loss = float(np.mean(error ** 2))
 
-            grads = strategy.compute_updates(activations, error)
-            for idx, W in enumerate(weights):
-                grad = grads.get(f"W{idx}")
-                if grad is None:
-                    continue
-                W = W - lr * grad
-                if quant_kind == "det":
-                    W = quantize_ternary_det(W, tau)
-                elif quant_kind == "stoch":
-                    W = quantize_ternary_stoch(W, tau, quant_rng)
-                weights[idx] = W
+@dataclass
+class SGDOptimizer:
+    """Vanilla SGD with optional momentum (unused but extendable)."""
 
-            metrics = {"loss": loss}
-            for callback in callbacks:
-                if hasattr(callback, "on_step"):
-                    callback.on_step(step, metrics)  # type: ignore[attr-defined]
-                else:
-                    callback(step, metrics)
+    lr: float
 
-            if hasattr(strategy, "on_epoch_end") and (step + 1) % eval_interval == 0:
-                strategy.on_epoch_end()  # type: ignore[attr-defined]
+    def step(self, model: FeedForwardModel, grads: Gradients) -> None:
+        scaled = {name: -self.lr * grad for name, grad in grads.items()}
+        model.apply_gradients(scaled)
 
-        return RunResult(steps=steps, metrics_path=str(metrics_path), manifest_path=str(manifest_path))
 
+class Trainer:
+    """Run deterministic training loops with pluggable feedback strategies."""
+
+    def __init__(
+        self,
+        model: FeedForwardModel,
+        strategy: FeedbackStrategy,
+        optimizer: SGDOptimizer,
+        callbacks: Sequence[object] | None = None,
+    ) -> None:
+        self.model = model
+        self.strategy = strategy
+        self.optimizer = optimizer
+        self.callbacks = list(callbacks or [])
+        self._state: StrategyState | None = None
+
+    def run(
+        self,
+        dataloader: Iterable[Batch],
+        epochs: int,
+        seed: int,
+        device: str = "cpu",
+        *,
+        determinism: bool = True,
+        steps_per_epoch: int | None = None,
+    ) -> RunResult:
+        if device != "cpu":  # pragma: no cover - guardrail
+            raise ValueError("Only CPU execution is supported in the reference trainer")
+
+        self._set_seed(seed, determinism)
+        self.model.reset(seed)
+        state = self.strategy.init(self.model.describe())
+        iterator = iter(dataloader)
+        total_steps = 0
+        last_metrics: Mapping[str, float] = {}
+
+        for epoch in range(epochs):
+            steps_this_epoch = steps_per_epoch or self._infer_steps(dataloader)
+            for _ in range(steps_this_epoch):
+                try:
+                    batch = next(iterator)
+                except StopIteration:
+                    iterator = iter(dataloader)
+                    batch = next(iterator)
+                predictions, activations = self.model.forward(batch.inputs)
+                error = predictions - batch.targets
+                loss = float(np.mean(np.square(error)))
+                grads, state = self.strategy.backward(activations, error, state)
+                self.optimizer.step(self.model, grads)
+                self.model.quantise()
+
+                metrics = {"loss": loss}
+                self._emit_step(total_steps, metrics)
+                last_metrics = metrics
+                total_steps += 1
+
+            state.metadata["pending_refresh"] = True
+            self._emit_epoch(epoch, last_metrics)
+
+        self._state = state
+        return RunResult(steps=total_steps, metrics_path="", manifest_path="")
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+
+    def _emit_step(self, step: int, metrics: Mapping[str, float]) -> None:
+        for callback in self.callbacks:
+            if hasattr(callback, "on_step"):
+                callback.on_step(step, metrics)  # type: ignore[attr-defined]
+            elif callable(callback):
+                callback(step, metrics)
+
+    def _emit_epoch(self, epoch: int, metrics: Mapping[str, float]) -> None:
+        for callback in self.callbacks:
+            if hasattr(callback, "on_epoch"):
+                callback.on_epoch(epoch, metrics)  # type: ignore[attr-defined]
+
+    @staticmethod
+    def _set_seed(seed: int, determinism: bool) -> None:
+        if determinism:
+            random.seed(seed)
+            np.random.seed(seed)
+
+    @staticmethod
+    def _infer_steps(dataloader: Iterable[Batch]) -> int:
+        if hasattr(dataloader, "__len__"):
+            return len(dataloader)  # type: ignore[arg-type]
+        return 1

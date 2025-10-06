@@ -10,38 +10,39 @@
 graph TD
     subgraph feedflipnets.core
         activations[activations]
-        quantization[quantization]
-        feedback[feedback_strategies]
+        quant[quant]
+        strategies[strategies]
+        types[types]
     end
     subgraph feedflipnets.data
-        registry[data_registry]
-        loaders[dataset_loaders]
-        cache[cache_manager]
+        registry[data.registry]
+        cache[data.cache]
+        loaders[data.loaders]
     end
     subgraph feedflipnets.training
-        trainer[trainer]
-        pipelines[experiment_pipeline]
+        trainer[training.trainer]
+        pipelines[training.pipelines]
     end
     subgraph feedflipnets.reporting
-        metrics[metrics_sink]
-        plots[plot_adapter]
-        artifacts[artifact_writer]
+        metrics[reporting.metrics]
+        plots[reporting.plots]
+        artifacts[reporting.artifacts]
     end
     subgraph cli
-        cli_entry[cli]
+        entry[cli.main]
     end
 
     registry --> loaders
     loaders --> cache
-    trainer --> activations
-    trainer --> quantization
-    trainer --> feedback
+    trainer --> strategies
+    trainer --> quant
+    trainer --> types
     pipelines --> trainer
+    pipelines --> registry
     pipelines --> metrics
     pipelines --> plots
     pipelines --> artifacts
-    cli_entry --> pipelines
-    data_registry -.-> metrics
+    entry --> pipelines
 ```
 
 ## Dependency Rules
@@ -52,9 +53,9 @@ graph TD
 - CLI/experiments import only `training` and `reporting` interfaces.
 
 ## Public APIs
-- `feedflipnets.core.feedback` exposes `FeedbackStrategy` protocol with `compute_updates(activations, error)` signature.  
-- `feedflipnets.training.trainer.Trainer.run(config, data_iter, callbacks)` returns structured `RunResult`.  
-- `feedflipnets.data.registry.get_dataset(name, options)` returns dataset metadata + loader callable.  
+- `feedflipnets.core.strategies.FeedbackStrategy` defines `init(model)` and `backward(activations, error, state)`.
+- `feedflipnets.training.trainer.Trainer.run(dataloader, epochs, seed, *, determinism=True)` returns a `RunResult`.
+- `feedflipnets.data.registry.get(name, *, offline=True, cache_dir=None, **options)` returns dataset metadata + loader callable.
 - `feedflipnets.reporting.metrics.emit(event)` writes to JSONL/CSV sinks; CLI chooses sinks via config.
 
 ## Data Flow
