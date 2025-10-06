@@ -1,127 +1,97 @@
 # FeedFlipNets
 
-## Project Overview
-FeedFlipNets implements "flip" feedback alignment: networks update ternary weights
-in {-1, 0, 1} while projecting output errors to hidden layers with fixed feedback
-matrices. The vNext architecture splits the project into well-defined packages so
-that training strategies, datasets and reporting utilities can be combined
-modularly. Deterministic pipelines and offline fixtures make the experiments
-reproducible without network access.
+![CI](https://github.com/akigogikar/FeedFlipNets/actions/workflows/ci.yml/badge.svg)
 
-### Key Capabilities
-- **Core primitives** – pure NumPy activations, ternary quantisation helpers and
-  feedback-alignment strategies.
-- **Data layer** – cache-first dataset registry with offline shards for MNIST,
-  TinyStories and UCR/UEA samples.
-- **Training pipelines** – configurable trainer that applies post-update
-  quantisation and pluggable feedback strategies.
-- **Reporting** – JSONL metrics sink, optional headless-safe plotting and run
-  manifests with git/version metadata.
+FeedFlipNets implements deterministic feedback-alignment experiments with ternary
+weights. The repository is structured into four focused packages—`core`, `data`,
+`training`, and `reporting`—with a thin CLI that wires them together. All
+pipelines are offline-first and produce reproducible metrics/artefacts suitable
+for publication workflows.
 
-## Installation
-FeedFlipNets targets Python 3.10+. The dependency lock file is the single source
-of truth:
+## 90-second first run
 
 ```bash
-pip install -r requirements-lock.txt
+# 1. Create the virtualenv and install pinned dependencies
+make bootstrap
+
+# 2. Run the lint + test suite (offline)
+make lint
+make test
+
+# 3. Execute the offline smoke preset and inspect outputs
+make smoke
+ls runs/basic-dfa-cpu
 ```
 
-For editable installs:
+`make smoke` writes `metrics.jsonl`, `metrics.csv`, `manifest.json`, and plots
+(when enabled) under `runs/basic-dfa-cpu/`. Running the command twice yields
+identical metrics hashes thanks to deterministic seeds.
+
+## CLI usage
+
+The CLI defaults to offline mode and the `basic_dfa_cpu` preset:
 
 ```bash
-pip install -e .
+python -m cli.main --preset basic_dfa_cpu --dump-config tmp/config.json
+python -m cli.main --preset synthetic-min --enable-plots --offline
 ```
 
-## Run Modes
-FeedFlipNets is designed for automation-first, reproducible runs. The following
-modes are supported:
+Optional `--config` overrides accept JSON or YAML files. The CLI exports the
+resolved configuration, including the offline flag, to the pipeline. When
+`FEEDFLIP_DATA_OFFLINE=1` (default) no network calls are attempted; fixtures are
+generated locally via the cache manifest.
 
-- **Offline datasets** – set `FEEDFLIP_DATA_OFFLINE=1` to force loaders to use
-  bundled fixtures. No network access is attempted in this mode.
-- **Headless plotting** – plotting is disabled by default. Enable it per run with
-  `"enable_plots": true` in the training config or `--enable-plots` once exposed.
-- **Deterministic metrics** – fixed seeds plus deterministic JSONL timestamps
-  ensure repeated runs produce identical first 20 metric entries (within 1e-7).
-- **Structured feedback** – orthogonal, Hadamard, block-diagonal and low-rank
-  feedback matrices are reproducible under fixed seeds; refresh policies
-  (`fixed`, `per_step`, `per_epoch`) control when matrices are regenerated.
+## Module map
 
-## Quickstart
-Experiments are executed through the unified CLI:
-
-```bash
-python -m cli.main --preset synthetic-min
+```text
+feedflipnets/
+  core/        -> numerical primitives (activations, quant, strategies, types)
+  data/        -> dataset registry, cache manifest, offline loaders
+  training/    -> trainer abstraction, pipelines, schedulers
+  reporting/   -> metrics sinks (JSONL/CSV), headless plotting, manifests
+  cli/         -> argparse entrypoint with presets and config overrides
 ```
 
-Available presets:
+Key architecture rules:
 
-- `synthetic-min` – 200 deterministic steps on an in-memory sinusoid.
-- `mnist-flip-det` – flip-strategy ternary run using the MNIST fixture.
-- `tinystories-dfa-stoch` – DFA strategy with stochastic ternary quantisation.
-- `synthetic-structured-orthogonal-fixed` – structured feedback with fixed
-  orthogonal refresh on a medium synthetic dataset.
-- `synthetic-structured-hadamard-perstep` – Hadamard-structured feedback that
-  regenerates per step for a stochastic baseline.
-- `depth-frequency-sweep` – automation wrapper that reuses the new pipeline for
-  depth/update-frequency sweeps.
+- `core` has no dependencies on other packages.
+- `data` depends on `core` only; loaders rely on the cache manifest for offline
+  provenance.
+- `training` orchestrates `core`, `data`, and `reporting` components.
+- `reporting` consumes `core` utilities only, ensuring headless execution.
 
-Run details are written to `runs/<preset>/` (or a custom `run_dir`). The JSONL
-metrics file contains `{step, ts, metric_name: value}` entries; the manifest in
-the same directory records the git SHA, dataset provenance and seeds.
+See [`_design/ARCHITECTURE_TARGET.md`](./_design/ARCHITECTURE_TARGET.md) for the
+full dependency matrix and Mermaid diagram.
 
-## Module Map
-The repository is organised as follows:
+## Development workflow
 
-- `feedflipnets/core/`
-  - `types.py` – shared type aliases and `FeedbackStrategy` protocol.
-  - `activations.py` – pure NumPy activations (e.g. ReLU, Hadamard padding).
-  - `quantization.py` – ternary helpers including deterministic and stochastic
-    quantisers.
-  - `feedback.py` – DFA, flip-feedback, structured matrices and backprop-lite
-    implementations.
-- `feedflipnets/data/`
-  - `cache_manager.py` – cache.fetch with offline fixtures, checksum validation
-    and retries.
-  - `registry.py` – dataset registry returning `DatasetSpec` objects with
-    provenance metadata.
-  - `loaders/` – synthetic, MNIST, TinyStories and UCR/UEA loaders that operate
-    offline-first.
-- `feedflipnets/training/`
-  - `trainer.py` – core training loop applying feedback strategies and ternary
-    quantisation.
-  - `pipelines.py` – assembles data, model configs, reporting adapters and
-    exposes presets.
-- `feedflipnets/reporting/`
-  - `metrics.py` – JSONL sink with deterministic timestamps.
-  - `plots.py` – optional matplotlib plotting gated behind `enable_plots`.
-  - `artifacts.py` – manifest writer capturing git SHA, seeds and dataset
-    fingerprints.
-- `cli/main.py` – single entrypoint CLI orchestrating presets and overrides.
-- `feedflipnets/train.py` – deprecated shim that forwards legacy calls to the
-  new pipeline and emits a deprecation warning.
+- **Install** – `make bootstrap`
+- **Lint** – `make lint` (Ruff + Black + Import Linter contracts)
+- **Test** – `make test` (offline, coverage ≥ 75%)
+- **Smoke** – `make smoke` (offline deterministic preset)
 
-## Development & Testing
-Convenience targets are provided via `make`:
+The dependency lock file (`requirements-lock.txt`) is the single source of truth
+for tooling. All tests and smoke runs set `FEEDFLIP_DATA_OFFLINE=1` to prevent
+network calls.
 
-```bash
-make setup      # install dependencies
-make test       # run unit tests
-make lint       # run import-linter contracts
-make smoke      # smoke test synthetic preset
-```
+## Reporting artefacts
 
-Manual commands:
+`feedflipnets.reporting.metrics.JsonlSink` records `{step, split, loss,
+accuracy, seed, sha}` entries alongside additional float metrics. The
+`CsvSink` mirrors the schema for spreadsheet workflows. `PlotAdapter` writes
+loss curves using the Agg backend so that CI remains headless. Manifests include
+Git SHA, dataset provenance (with checksums), and runtime environment details.
 
-```bash
-pip install -r requirements-lock.txt
-pytest
-lint-imports
-python -m cli.main --preset synthetic-min
-```
+## Legacy shims
 
-Set `FEEDFLIP_DATA_OFFLINE=1` in CI or local shells to ensure offline fixtures
-are used. The CLI defaults to headless mode, so matplotlib is only imported when
-plots are explicitly enabled.
+`feedflipnets.train` exposes `train_single` and `sweep_and_log` for backwards
+compatibility. The functions forward to the new pipeline and emit
+`DeprecationWarning`s with upgrade guidance. Modern consumers should rely on the
+CLI or call `feedflipnets.training.pipelines.run_pipeline` directly.
 
-## Reference & License
-FeedFlipNets is released under the MIT License. See `LICENSE` for details.
+## Further reading
+
+- [`_design/MIGRATION_RUNBOOK.md`](./_design/MIGRATION_RUNBOOK.md) – phased
+  rollout plan with rollback steps.
+- [`UPGRADING.md`](./UPGRADING.md) – guidance for migrating legacy scripts.
+- [`CHANGELOG.md`](./CHANGELOG.md) – highlights for the v1.0.0 release cycle.

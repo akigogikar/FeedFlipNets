@@ -12,6 +12,8 @@ import numpy as np
 from .data import registry
 from .training import pipelines
 
+_trapezoid = getattr(np, "trapezoid", np.trapz)
+
 _DEPRECATION_EMITTED = False
 
 
@@ -26,9 +28,15 @@ def _warn_once() -> None:
         _DEPRECATION_EMITTED = True
 
 
-def _dataset_options(dataset: str | None, freq: int, max_points: int | None, seed: int) -> Dict[str, object]:
+def _dataset_options(
+    dataset: str | None, freq: int, max_points: int | None, seed: int
+) -> Dict[str, object]:
     if dataset is None or dataset == "synthetic":
-        opts: Dict[str, object] = {"freq": freq, "n_points": max(max_points or 128, 32), "seed": seed}
+        opts: Dict[str, object] = {
+            "freq": freq,
+            "n_points": max(max_points or 128, 32),
+            "seed": seed,
+        }
         if max_points is not None:
             opts["n_points"] = max_points
         return {"name": "synthetic", "options": opts}
@@ -44,7 +52,7 @@ def _dataset_options(dataset: str | None, freq: int, max_points: int | None, see
 
 
 def _infer_dims(data_cfg: Dict[str, object]) -> Tuple[int, int]:
-    spec = registry.get_dataset(data_cfg["name"], **data_cfg.get("options", {}))  # type: ignore[arg-type]
+    spec = registry.get(data_cfg["name"], **data_cfg.get("options", {}))  # type: ignore[arg-type]
     batch = next(spec.loader("train", 1))
     return batch.inputs.shape[1], batch.targets.shape[1]
 
@@ -112,7 +120,7 @@ def train_single(
         for line in metrics_path.read_text().splitlines():
             record = json.loads(line)
             losses.append(float(record.get("loss", 0.0)))
-    auc = float(np.trapz(losses)) if losses else 0.0
+    auc = float(_trapezoid(losses)) if losses else 0.0
     t01 = next((idx for idx, loss in enumerate(losses) if loss < 0.01), epochs + 1)
     return losses, auc, t01
 
@@ -142,7 +150,9 @@ def sweep_and_log(
     }
     (out_path / "summary.json").write_text(json.dumps(summary, indent=2))
 
-    final_tables: Dict[str, np.ndarray] = {m: np.zeros((len(depths), len(freqs))) for m in methods}
+    final_tables: Dict[str, np.ndarray] = {
+        m: np.zeros((len(depths), len(freqs))) for m in methods
+    }
 
     for method in methods:
         for i, depth in enumerate(depths):
@@ -159,11 +169,14 @@ def sweep_and_log(
                         max_points=max_points,
                     )
                     curves.append(curve)
-                    np.save(out_path / f"curve_{method.replace(' ', '_')}_d{depth}_k{freq}_seed{seed}.npy", np.array(curve))
+                    np.save(
+                        out_path
+                        / f"curve_{method.replace(' ', '_')}_d{depth}_k{freq}_seed{seed}.npy",
+                        np.array(curve),
+                    )
                 if curves:
                     final_tables[method][i, j] = curves[-1][-1] if curves[-1] else 0.0
     return final_tables
 
 
 __all__ = ["train_single", "sweep_and_log"]
-

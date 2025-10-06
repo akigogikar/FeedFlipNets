@@ -8,7 +8,7 @@ from typing import Tuple
 
 import numpy as np
 
-from .core.quantization import quantize_ternary_det, quantize_ternary_stoch, ternary
+from .core.quant import quantize_ternary_det, quantize_ternary_stoch, ternary
 from .data import registry
 from .data.loaders import mnist as _mnist  # noqa: F401
 from .data.loaders import synthetic as _synthetic  # noqa: F401
@@ -33,7 +33,9 @@ def make_dataset(
         return x, y_true + 0.05 * rng.standard_normal(size=y_true.shape)
 
     if dataset == "mnist":
-        spec = registry.get_dataset("mnist", subset="train", max_items=max_points or 1, one_hot=False)
+        spec = registry.get(
+            "mnist", subset="train", max_items=max_points or 1, one_hot=False
+        )
         batch = next(spec.loader("train", 1))
         x = batch.inputs[0:1]
         if max_points is not None:
@@ -44,7 +46,7 @@ def make_dataset(
 
     if dataset and dataset.startswith("ucr:"):
         name = dataset.split(":", 1)[1]
-        spec = registry.get_dataset("ucr_uea", name=name)
+        spec = registry.get("ucr_uea", name=name)
         batch = next(spec.loader("train", 1))
         x = batch.inputs[0:1]
         if max_points is not None:
@@ -54,7 +56,7 @@ def make_dataset(
         return x, y
 
     if dataset == "tinystories":
-        spec = registry.get_dataset("tinystories")
+        spec = registry.get("tinystories")
         batch = next(spec.loader("train", 1))
         x = batch.inputs[0:1]
         if max_points is not None:
@@ -76,21 +78,24 @@ def tanh_deriv(x: np.ndarray) -> np.ndarray:
 
 
 def quantize_stoch(W: np.ndarray, thr: float) -> np.ndarray:
-    warnings.warn("Use feedflipnets.core.quantization.quantize_ternary_stoch instead", DeprecationWarning)
+    warnings.warn(
+        "Use feedflipnets.core.quant.quantize_ternary_stoch instead", DeprecationWarning
+    )
     rng = np.random.default_rng()
     return quantize_ternary_stoch(W, thr, rng)
 
 
 def quantize_fixed(W: np.ndarray, thr: float = 0.0) -> np.ndarray:
-    warnings.warn("Use feedflipnets.core.quantization.quantize_ternary_det instead", DeprecationWarning)
+    warnings.warn(
+        "Use feedflipnets.core.quant.quantize_ternary_det instead", DeprecationWarning
+    )
     return quantize_ternary_det(W, thr)
 
 
 def quantize_sign(W: np.ndarray) -> np.ndarray:
-    warnings.warn("Use feedflipnets.core.quantization.ternary instead", DeprecationWarning)
+    warnings.warn("Use feedflipnets.core.quant.ternary instead", DeprecationWarning)
     return ternary(W)
 
 
 def ensure_dir(path: str | Path) -> None:
     Path(path).mkdir(parents=True, exist_ok=True)
-

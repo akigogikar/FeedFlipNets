@@ -12,7 +12,9 @@ from typing import Mapping
 
 def _git_sha() -> str:
     try:
-        out = subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL)
+        out = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL
+        )
         return out.decode().strip()
     except Exception:  # pragma: no cover - git may be unavailable in tests
         return "unknown"
@@ -40,4 +42,3 @@ def write_manifest(
     }
     path.write_text(json.dumps(manifest, indent=2))
     return str(path)
-

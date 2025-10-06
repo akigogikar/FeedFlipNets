@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterator
 
 import numpy as np
@@ -33,7 +34,15 @@ def _make_dataset(freq: int, n_points: int, seed: int) -> _SyntheticDataset:
     return _SyntheticDataset(x=x.astype(np.float32), y=y.astype(np.float32))
 
 
-def _factory(freq: int = 3, n_points: int = 512, seed: int = 0, **_: object) -> DatasetSpec:
+def _factory(
+    freq: int = 3,
+    n_points: int = 512,
+    seed: int = 0,
+    *,
+    offline: bool = True,  # unused but kept for signature parity
+    cache_dir: str | Path | None = None,
+    **_: object,
+) -> DatasetSpec:
     dataset = _make_dataset(freq=freq, n_points=n_points, seed=seed)
     provenance = {
         "type": "synthetic",
@@ -52,4 +61,3 @@ def _factory(freq: int = 3, n_points: int = 512, seed: int = 0, **_: object) -> 
 
 
 register_dataset("synthetic", _factory)
-

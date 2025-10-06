@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from functools import partial
 from pathlib import Path
 from typing import Iterator
@@ -9,15 +10,16 @@ from typing import Iterator
 import numpy as np
 
 from ...core.types import Batch
-from ..cache_manager import fetch
+from ..cache import fetch
 from ..registry import DatasetSpec, register_dataset
 
 _URL = "https://www.timeseriesclassification.com/Downloads/Archives/Univariate2018_arff.zip"
-_CHECKSUM = "94b8ac5753e76d7052252e380e11564d268758813a8fd0a6d5632fe94feb676e"
+_CHECKSUM = "2476234343311b7f97a83bc26b1378fac835e12d8d327ce2e9bb4ed0a5926c7c"
 
 
 def _build_offline_fixture(path: Path, dataset: str = "sample") -> None:
-    rng = np.random.default_rng(abs(hash(dataset)) % 2**32)
+    seed = int(hashlib.sha256(dataset.encode("utf-8")).hexdigest()[:8], 16)
+    rng = np.random.default_rng(seed)
     length = 128
     timesteps = 60
     X = rng.standard_normal((length, timesteps)).astype(np.float32)
@@ -25,13 +27,28 @@ def _build_offline_fixture(path: Path, dataset: str = "sample") -> None:
     np.savez(path, X=X, y=y)
 
 
-def _factory(name: str = "sample", seed: int = 0, **options: object) -> DatasetSpec:
-    del options
+def _factory(
+    name: str = "sample",
+    seed: int = 0,
+    *,
+    dataset_name: str | None = None,
+    offline: bool = True,
+    cache_dir: str | Path | None = None,
+    **_: object,
+) -> DatasetSpec:
+    dataset_id = dataset_name or name
+    base_cache = Path(cache_dir) if cache_dir is not None else Path(".cache/feedflip")
+    offline_path = base_cache / "offline" / f"ucr_{dataset_id}.npz"
+    checksum = _CHECKSUM if dataset_id == "sample" else None
     path, provenance = fetch(
-        _URL,
-        checksum=_CHECKSUM,
-        filename=f"ucr_{name}.npz",
-        offline_builder=partial(_build_offline_fixture, dataset=name),
+        name=f"ucr_{dataset_id}",
+        url=_URL,
+        checksum=checksum,
+        filename=f"ucr_{dataset_id}.npz",
+        offline_path=offline_path,
+        offline_builder=partial(_build_offline_fixture, dataset=dataset_id),
+        offline=offline,
+        cache_dir=cache_dir,
     )
     with np.load(path) as data:
         X = data["X"].astype(np.float32)
@@ -49,9 +66,13 @@ def _factory(name: str = "sample", seed: int = 0, **options: object) -> DatasetS
             yield Batch(inputs=X[idx], targets=targets[idx])
 
     provenance = dict(provenance)
-    provenance.update({"dataset": name, "samples": X.shape[0]})
-    return DatasetSpec(name="ucr_uea", provenance=provenance, loader=loader)
+    provenance.update({"dataset": dataset_id, "samples": X.shape[0]})
+    return DatasetSpec(
+        name="ucr_uea",
+        provenance=provenance,
+        loader=loader,
+        checksum=provenance.get("checksum"),
+    )
 
 
 register_dataset("ucr_uea", _factory)
-

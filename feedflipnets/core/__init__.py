@@ -1,6 +1,5 @@
 """Core numerical primitives for FeedFlipNets."""
 
-from . import activations, feedback, quantization, types
+from . import activations, feedback, quant, strategies, types
 
-__all__ = ["activations", "feedback", "quantization", "types"]
-
+__all__ = ["activations", "quant", "strategies", "types", "feedback"]

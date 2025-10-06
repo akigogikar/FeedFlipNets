@@ -1,13 +1,24 @@
-.PHONY: setup smoke test lint
+.PHONY: bootstrap lint test smoke
 
-setup:
-	pip install -r requirements-lock.txt
+VENV ?= .venv
+PYTHON ?= python3
+PIP := $(VENV)/bin/pip
+PYTEST := $(VENV)/bin/pytest
+RUFF := $(VENV)/bin/ruff
+BLACK := $(VENV)/bin/black
+IMPORTLINTER := $(VENV)/bin/lint-imports
 
-smoke:
-	FEEDFLIP_DATA_OFFLINE=1 python -m cli.main --preset synthetic-min
-
-test:
-	FEEDFLIP_DATA_OFFLINE=1 pytest
+bootstrap:
+	$(PYTHON) -m venv $(VENV)
+	$(PIP) install -r requirements-lock.txt
 
 lint:
-	lint-imports
+	$(RUFF) check cli feedflipnets tests
+	$(BLACK) --check cli feedflipnets tests
+	$(IMPORTLINTER)
+
+test:
+	PYTHONPATH=. FEEDFLIP_DATA_OFFLINE=1 $(PYTEST) -m "not network" --cov=feedflipnets --cov-report=term-missing --cov-fail-under=75
+
+smoke:
+	PYTHONPATH=. FEEDFLIP_DATA_OFFLINE=1 $(VENV)/bin/python -m cli.main --preset basic_dfa_cpu
