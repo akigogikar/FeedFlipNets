@@ -32,3 +32,62 @@ jobs:
         with:
           name: smoke-${{ matrix.python-version }}
           path: smoke-${{ matrix.python-version }}.tar.gz
+
+  determinism:
+    runs-on: ubuntu-latest
+    needs: lint-test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Bootstrap environment
+        run: make bootstrap
+      - name: Run registry experiment (baseline)
+        run: |
+          set -eo pipefail
+          PYTHONPATH=. FEEDFLIP_DATA_OFFLINE=1 .venv/bin/python -m cli.main --experiment dfa_baseline > run-output.json
+      - name: Snapshot hashes
+        run: |
+          python - <<'PY'
+import hashlib
+import json
+from pathlib import Path
+
+payload = json.loads(Path("run-output.json").read_text())
+records = {}
+for key in ("metrics", "summary"):
+    digest = hashlib.sha256(Path(payload[key]).read_bytes()).hexdigest()
+    records[key] = digest
+Path("hashes.json").write_text(json.dumps({"payload": payload, "hashes": records}, indent=2))
+PY
+      - name: Run registry experiment (repeat)
+        run: |
+          set -eo pipefail
+          PYTHONPATH=. FEEDFLIP_DATA_OFFLINE=1 .venv/bin/python -m cli.main --experiment dfa_baseline > run-output-2.json
+      - name: Verify determinism
+        run: |
+          python - <<'PY'
+import hashlib
+import json
+from pathlib import Path
+
+baseline = json.loads(Path("hashes.json").read_text())
+current = json.loads(Path("run-output-2.json").read_text())
+for key in ("metrics", "summary"):
+    digest = hashlib.sha256(Path(current[key]).read_bytes()).hexdigest()
+    if digest != baseline["hashes"][key]:
+        raise SystemExit(f"Mismatch detected for {key}")
+Path("run-id.txt").write_text(current.get("run_id", ""))
+PY
+      - name: Build paper bundle
+        run: |
+          run_id=$(cat run-id.txt)
+          PYTHONPATH=. FEEDFLIP_DATA_OFFLINE=1 .venv/bin/python scripts/build_paper_bundle.py --run-dir .artifacts/$run_id --out paper_bundle --include-plots > bundle-output.json
+      - name: Upload paper bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-bundle
+          path: |
+            paper_bundle
+            paper_bundle.zip

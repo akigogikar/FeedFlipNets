@@ -1,0 +1,5 @@
+{
+  "required_keys": ["version", "experiments"],
+  "experiment_required": ["dataset", "strategy", "steps", "seed"],
+  "strategy_enum": ["dfa", "flip", "structured"]
+}

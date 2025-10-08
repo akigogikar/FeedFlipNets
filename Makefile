@@ -1,4 +1,4 @@
-.PHONY: bootstrap lint test smoke
+.PHONY: bootstrap lint test smoke perf bundle release-rc
 
 VENV ?= .venv
 PYTHON ?= python3
@@ -18,7 +18,18 @@ lint:
 	$(IMPORTLINTER)
 
 test:
-	PYTHONPATH=. FEEDFLIP_DATA_OFFLINE=1 $(PYTEST) -m "not network" --cov=feedflipnets --cov-report=term-missing --cov-fail-under=75
+	PYTHONPATH=. FEEDFLIP_DATA_OFFLINE=1 $(PYTEST) -m "not network and not perf" --cov=feedflipnets --cov-report=term-missing --cov-fail-under=75
 
 smoke:
 	PYTHONPATH=. FEEDFLIP_DATA_OFFLINE=1 $(VENV)/bin/python -m cli.main --preset basic_dfa_cpu
+
+perf:
+	PYTHONPATH=. FEEDFLIP_DATA_OFFLINE=1 $(PYTEST) -m "perf" --maxfail=1
+
+bundle:
+	@latest=$$(ls -td .artifacts/* 2>/dev/null | head -n 1); \
+	if [ -z "$$latest" ]; then echo "No artifacts found in .artifacts"; exit 1; fi; \
+	PYTHONPATH=. FEEDFLIP_DATA_OFFLINE=1 $(VENV)/bin/python scripts/build_paper_bundle.py --run-dir "$$latest" --out paper_bundle --include-plots
+
+release-rc:
+	@echo "FeedFlipNets v1.0.0-rc1 candidate ready. Run make lint test perf bundle before tagging."

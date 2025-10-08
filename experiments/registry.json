@@ -1,0 +1,35 @@
+{
+  "version": 1,
+    "defaults": {
+      "dataset": "synth_fixture",
+      "steps": 48,
+      "seed": 123,
+      "strategy": "dfa",
+      "batch_size": 4,
+      "lr": 0.05,
+      "hidden": [4],
+      "tau": 0.05
+    },
+  "experiments": {
+    "dfa_baseline": {
+      "dataset": "synth_fixture",
+      "strategy": "dfa",
+      "steps": 48,
+      "seed": 123
+    },
+    "flip_baseline": {
+      "dataset": "synth_fixture",
+      "strategy": "flip",
+      "steps": 48,
+      "seed": 123
+    },
+    "structured_probe": {
+      "dataset": "synth_fixture",
+      "strategy": "structured",
+      "steps": 48,
+      "seed": 321,
+      "structure_type": "orthogonal",
+      "feedback_refresh": "fixed"
+    }
+  }
+}

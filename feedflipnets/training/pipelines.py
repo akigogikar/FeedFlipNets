@@ -16,6 +16,7 @@ from ..data import registry
 from ..reporting.artifacts import write_manifest
 from ..reporting.metrics import CsvSink, JsonlSink
 from ..reporting.plots import PlotAdapter
+from ..reporting.summary import write_summary
 from .trainer import FeedForwardModel, SGDOptimizer, Trainer
 
 _PRESETS: Dict[str, Mapping[str, object]] = {
@@ -279,8 +280,15 @@ def _train_single(config: Mapping[str, object]) -> RunResult:
         config=_safe_config(config, hidden_dims),
         dataset_provenance=dataset.provenance,
     )
+    summary_tail = int(train_cfg.get("summary_tail", 32))
+    summary_path = write_summary(
+        metrics_path, run_dir / "summary.json", tail=summary_tail
+    )
     return RunResult(
-        steps=result.steps, metrics_path=str(metrics_path), manifest_path=manifest
+        steps=result.steps,
+        metrics_path=str(metrics_path),
+        manifest_path=manifest,
+        summary_path=str(summary_path),
     )
 
 

@@ -11,6 +11,7 @@ import numpy as np
 from .core.quant import quantize_ternary_det, quantize_ternary_stoch, ternary
 from .data import registry
 from .data.loaders import mnist as _mnist  # noqa: F401
+from .data.loaders import synth_fixture as _synth_fixture  # noqa: F401
 from .data.loaders import synthetic as _synthetic  # noqa: F401
 from .data.loaders import tinystories as _tinystories  # noqa: F401
 from .data.loaders import ucr_uea as _ucr  # noqa: F401
