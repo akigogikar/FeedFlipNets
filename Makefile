@@ -1,4 +1,4 @@
-.PHONY: bootstrap lint test smoke perf bundle release-rc
+.PHONY: bootstrap lint test smoke perf bundle release-rc bench
 
 VENV ?= .venv
 PYTHON ?= python3
@@ -32,4 +32,7 @@ bundle:
 	PYTHONPATH=. FEEDFLIP_DATA_OFFLINE=1 $(VENV)/bin/python scripts/build_paper_bundle.py --run-dir "$$latest" --out paper_bundle --include-plots
 
 release-rc:
-	@echo "FeedFlipNets v1.0.0-rc1 candidate ready. Run make lint test perf bundle before tagging."
+        @echo "FeedFlipNets v1.0.0-rc1 candidate ready. Run make lint test perf bundle before tagging."
+
+bench:
+        . .venv/bin/activate && python scripts/bench_micro.py --out .artifacts/bench

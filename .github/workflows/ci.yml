@@ -23,6 +23,22 @@ jobs:
         run: make lint
       - name: Run tests
         run: make test
+      - name: Micro-benchmark (offline)
+        run: |
+          python scripts/bench_micro.py --seeds 123 124 125 --steps 64 --out .artifacts/bench
+      - name: Attach benchmark to Step Summary
+        run: |
+          echo "## FeedFlipNets Micro-Benchmark" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          cat .artifacts/bench/bench_micro.md >> $GITHUB_STEP_SUMMARY
+      - name: Upload benchmark artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-micro
+          path: |
+            .artifacts/bench/bench_micro.md
+            .artifacts/bench/bench_micro.csv
+            .artifacts/bench/results.jsonl
       - name: Smoke test
         run: make smoke
       - name: Archive smoke artifacts
