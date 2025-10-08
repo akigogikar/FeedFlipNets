@@ -25,6 +25,7 @@ class RunResult:
     steps: int
     metrics_path: str
     manifest_path: str
+    summary_path: str = ""
 
 
 @dataclass

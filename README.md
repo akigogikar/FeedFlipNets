@@ -36,10 +36,36 @@ python -m cli.main --preset basic_dfa_cpu --dump-config tmp/config.json
 python -m cli.main --preset synthetic-min --enable-plots --offline
 ```
 
-Optional `--config` overrides accept JSON or YAML files. The CLI exports the
+Optional `--config` overrides accept JSON or YAML files. When the override
+contains complete `data`/`model`/`train` sections it is treated as a standalone
+configuration; otherwise it patches the selected preset. The CLI exports the
 resolved configuration, including the offline flag, to the pipeline. When
 `FEEDFLIP_DATA_OFFLINE=1` (default) no network calls are attempted; fixtures are
 generated locally via the cache manifest.
+
+### Run an experiment from the registry
+
+```bash
+python -m cli.main --experiment dfa_baseline
+python -m cli.main --experiment dfa_baseline  # identical metrics + summary bytes
+```
+
+Registry-backed runs derive a deterministic `run_id` from the configuration
+hash. Artefacts are written to `.artifacts/<run_id>/` with
+`metrics.jsonl`, `summary.json`, and the manifest. Re-running the same
+experiment reuses the directory and produces byte-identical outputs.
+
+### Build a paper bundle
+
+After an experiment completes, generate a reproducible archive:
+
+```bash
+python scripts/build_paper_bundle.py --run-dir .artifacts/<run_id> --include-plots
+```
+
+The script copies metrics, recomputes a deterministic summary, materialises
+CSV tables, renders optional plots using the Agg backend, and writes a
+`paper_bundle.zip` alongside the `paper_bundle/` directory for upload.
 
 ## Module map
 

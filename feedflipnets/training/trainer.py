@@ -159,7 +159,9 @@ class Trainer:
             self._emit_epoch(epoch, last_metrics)
 
         self._state = state
-        return RunResult(steps=total_steps, metrics_path="", manifest_path="")
+        return RunResult(
+            steps=total_steps, metrics_path="", manifest_path="", summary_path=""
+        )
 
     # ------------------------------------------------------------------
     # Internal helpers

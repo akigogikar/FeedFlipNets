@@ -1,0 +1,7 @@
+cff-version: 1.2.0
+title: "FeedFlipNets: Deterministic Offline Framework for Feedback Alignment"
+authors:
+  - family-names: "Gogikar"
+    given-names: "Aki"
+version: "1.0.0-rc1"
+date-released: "2024-03-20"
