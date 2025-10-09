@@ -1,5 +1,5 @@
-import subprocess, sys
-from pathlib import Path
+import subprocess
+import sys
 
 def test_bench_micro_runs_quickly(tmp_path):
     out = tmp_path / "bench"

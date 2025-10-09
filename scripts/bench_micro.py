@@ -1,5 +1,7 @@
 from __future__ import annotations
-import argparse, csv, json
+import argparse
+import csv
+import json
 from pathlib import Path
 from statistics import mean, pstdev
 from feedflipnets.core.np_mlp import train_one
@@ -20,7 +22,8 @@ def main():
     ap.add_argument("--out", type=str, default=".artifacts/bench")
     args = ap.parse_args()
 
-    out = Path(args.out); out.mkdir(parents=True, exist_ok=True)
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
     runs = []
     for strat in STRATS:
         for s in args.seeds:
