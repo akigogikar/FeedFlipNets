@@ -1,109 +1,90 @@
-name: CI
+name: ci
 
 on:
   push:
-    branches: ["*"]
+    branches:
+      - "**"
   pull_request:
+    branches:
+      - "**"
+
+permissions:
+  contents: read
 
 jobs:
-  lint-test:
+  build-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.11"]
+    env:
+      PYTHONUNBUFFERED: "1"
+      FEEDFLIP_OFFLINE: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Bootstrap environment
-        run: make bootstrap
-      - name: Lint
-        run: make lint
-      - name: Run tests
-        run: make test
-      - name: Micro-benchmark (offline)
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements-lock.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies (lockfile preferred)
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements-lock.txt ]; then
+            pip install -r requirements-lock.txt
+          elif [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          else
+            echo "ERROR: no requirements-lock.txt or requirements.txt found"; exit 1
+          fi
+
+      - name: Lint (ruff + black)
+        run: |
+          ruff --version || pip install ruff
+          black --version || pip install black
+          ruff check .
+          black --check .
+
+      - name: Run tests (offline coverage)
+        run: |
+          pytest -m "not network" --cov=feedflipnets --cov-report=term-missing --cov-fail-under=60
+
+      - name: Micro-benchmark (offline, numpy-only)
         run: |
           python scripts/bench_micro.py --seeds 123 124 125 --steps 64 --out .artifacts/bench
+
+      - name: Determinism check (run twice; hashes must match)
+        run: |
+          sha256sum .artifacts/bench/bench_micro.csv .artifacts/bench/bench_micro.md > .artifacts/hash1.txt
+          python scripts/bench_micro.py --seeds 123 124 125 --steps 64 --out .artifacts/bench
+          sha256sum .artifacts/bench/bench_micro.csv .artifacts/bench/bench_micro.md > .artifacts/hash2.txt
+          diff -u .artifacts/hash1.txt .artifacts/hash2.txt
+
       - name: Attach benchmark to Step Summary
         run: |
-          echo "## FeedFlipNets Micro-Benchmark" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          cat .artifacts/bench/bench_micro.md >> $GITHUB_STEP_SUMMARY
-      - name: Upload benchmark artifacts
+          {
+            echo "## FeedFlipNets Micro-Benchmark";
+            echo;
+            cat .artifacts/bench/bench_micro.md;
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: bench-micro
+          name: bench-micro-${{ matrix.python-version }}
           path: |
             .artifacts/bench/bench_micro.md
             .artifacts/bench/bench_micro.csv
             .artifacts/bench/results.jsonl
-      - name: Smoke test
-        run: make smoke
-      - name: Archive smoke artifacts
-        run: |
-          tar -czf smoke-${{ matrix.python-version }}.tar.gz runs/basic-dfa-cpu || true
-      - uses: actions/upload-artifact@v4
-        with:
-          name: smoke-${{ matrix.python-version }}
-          path: smoke-${{ matrix.python-version }}.tar.gz
-
-  determinism:
-    runs-on: ubuntu-latest
-    needs: lint-test
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-      - name: Bootstrap environment
-        run: make bootstrap
-      - name: Run registry experiment (baseline)
-        run: |
-          set -eo pipefail
-          PYTHONPATH=. FEEDFLIP_DATA_OFFLINE=1 .venv/bin/python -m cli.main --experiment dfa_baseline > run-output.json
-      - name: Snapshot hashes
-        run: |
-          python - <<'PY'
-import hashlib
-import json
-from pathlib import Path
-
-payload = json.loads(Path("run-output.json").read_text())
-records = {}
-for key in ("metrics", "summary"):
-    digest = hashlib.sha256(Path(payload[key]).read_bytes()).hexdigest()
-    records[key] = digest
-Path("hashes.json").write_text(json.dumps({"payload": payload, "hashes": records}, indent=2))
-PY
-      - name: Run registry experiment (repeat)
-        run: |
-          set -eo pipefail
-          PYTHONPATH=. FEEDFLIP_DATA_OFFLINE=1 .venv/bin/python -m cli.main --experiment dfa_baseline > run-output-2.json
-      - name: Verify determinism
-        run: |
-          python - <<'PY'
-import hashlib
-import json
-from pathlib import Path
-
-baseline = json.loads(Path("hashes.json").read_text())
-current = json.loads(Path("run-output-2.json").read_text())
-for key in ("metrics", "summary"):
-    digest = hashlib.sha256(Path(current[key]).read_bytes()).hexdigest()
-    if digest != baseline["hashes"][key]:
-        raise SystemExit(f"Mismatch detected for {key}")
-Path("run-id.txt").write_text(current.get("run_id", ""))
-PY
-      - name: Build paper bundle
-        run: |
-          run_id=$(cat run-id.txt)
-          PYTHONPATH=. FEEDFLIP_DATA_OFFLINE=1 .venv/bin/python scripts/build_paper_bundle.py --run-dir .artifacts/$run_id --out paper_bundle --include-plots > bundle-output.json
-      - name: Upload paper bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: paper-bundle
-          path: |
-            paper_bundle
-            paper_bundle.zip
