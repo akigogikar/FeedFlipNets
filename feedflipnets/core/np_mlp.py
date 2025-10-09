@@ -110,7 +110,8 @@ class FlipTernaryStrategy:
 
 def make_dataset(n: int = 512, d: int = 32, seed: int = 123) -> Tuple[Array, Array]:
     rng = np.random.default_rng(seed)
-    m0 = rng.normal(0.0, 1.0, size=d);  m1 = rng.normal(0.5, 1.0, size=d)
+    m0 = rng.normal(0.0, 1.0, size=d)
+    m1 = rng.normal(0.5, 1.0, size=d)
     X0 = rng.normal(m0, 1.0, size=(n // 2, d))
     X1 = rng.normal(m1, 1.0, size=(n - n // 2, d))
     X  = np.vstack([X0, X1]).astype(np.float64)

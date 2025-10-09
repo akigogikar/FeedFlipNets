@@ -21,13 +21,14 @@ Dependencies: numpy, matplotlib; optional: scipy, pandas, pytest.
 """
 
 from __future__ import annotations
+
 import argparse
 import os
 import sys
-from typing import List
 
-# Allow running this script directly without installing the package
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+if __package__ in {None, ""}:
+    # Allow running this script directly without installing the package
+    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from feedflipnets.train import sweep_and_log
 
