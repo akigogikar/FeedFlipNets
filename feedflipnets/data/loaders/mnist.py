@@ -12,7 +12,7 @@ from ..cache import fetch
 from ..registry import DatasetSpec, register_dataset
 
 _URL = "https://storage.googleapis.com/tf-keras-datasets/mnist.npz"
-_CHECKSUM = "c4c5d4fa681872f17d7e4ef9910ea1a5dbef4ada1e77e7a6ff11fb09f827c229"
+_CHECKSUM = "fe63ad0f25b57d1097017e6636e2e3b5676d8d2d1b59f2ce20c06e5581eabea2"
 
 
 def _build_offline_fixture(path: Path) -> None:
