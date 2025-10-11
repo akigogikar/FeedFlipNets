@@ -8,6 +8,7 @@ from typing import Dict, List, Protocol, Sequence, Tuple
 import numpy as np
 
 from .types import ActivationState, Array, Gradients, ModelDescription, StrategyState
+from .quant import quantize_ternary_det
 
 
 class FeedbackStrategy(Protocol):
@@ -30,6 +31,34 @@ class _SimpleState(StrategyState):
     """State container for simple strategies."""
 
     feedback: List[Array] = field(default_factory=list)
+
+
+@dataclass
+class Backprop:
+    """Classical backpropagation using the model's forward weights."""
+
+    def init(self, model: ModelDescription) -> StrategyState:  # noqa: D401
+        return StrategyState()
+
+    def backward(
+        self,
+        activations: ActivationState,
+        error: Array,
+        state: StrategyState,
+    ) -> tuple[Gradients, StrategyState]:
+        weights = activations.weights
+        layer_inputs = activations.layer_inputs
+        layer_derivs = activations.layer_derivs
+
+        grads: Gradients = {}
+        batch = error.shape[0]
+        delta = error
+        last_idx = len(weights) - 1
+        grads[f"W{last_idx}"] = layer_inputs[last_idx].T @ delta / batch
+        for idx in reversed(range(last_idx)):
+            delta = (delta @ weights[idx + 1].T) * layer_derivs[idx]
+            grads[f"W{idx}"] = layer_inputs[idx].T @ delta / batch
+        return grads, state
 
 
 @dataclass
@@ -69,6 +98,48 @@ class DFA:
         for idx in reversed(range(last_idx)):
             feedback = feedback_mats[idx]
             delta = (delta @ feedback) * layer_derivs[idx]
+            grads[f"W{idx}"] = layer_inputs[idx].T @ delta / batch
+        return grads, state
+
+
+@dataclass
+class TernaryDFA:
+    """Direct feedback alignment with ternary-quantised feedback."""
+
+    rng: np.random.Generator
+    threshold: float = 0.1
+
+    def init(self, model: ModelDescription) -> StrategyState:
+        dims = model.layer_dims
+        output_dim = dims[-1]
+        matrices: List[Array] = []
+        for hidden_dim in dims[1:-1]:
+            scale = 1.0 / np.sqrt(output_dim)
+            matrix = (
+                self.rng.standard_normal((output_dim, hidden_dim)).astype(np.float32) * scale
+            )
+            matrices.append(quantize_ternary_det(matrix, self.threshold))
+        return _SimpleState(feedback=matrices)
+
+    def backward(
+        self,
+        activations: ActivationState,
+        error: Array,
+        state: StrategyState,
+    ) -> tuple[Gradients, StrategyState]:
+        feedback = list(getattr(state, "feedback", []))
+        layer_inputs = activations.layer_inputs
+        layer_derivs = activations.layer_derivs
+        weights = activations.weights
+
+        grads: Gradients = {}
+        batch = error.shape[0]
+        delta = error
+        last_idx = len(weights) - 1
+        grads[f"W{last_idx}"] = layer_inputs[last_idx].T @ delta / batch
+        for idx in reversed(range(last_idx)):
+            matrix = feedback[idx]
+            delta = (delta @ matrix) * layer_derivs[idx]
             grads[f"W{idx}"] = layer_inputs[idx].T @ delta / batch
         return grads, state
 
@@ -259,7 +330,9 @@ FlipFeedback = FlipTernary
 
 __all__ = [
     "FeedbackStrategy",
+    "Backprop",
     "DFA",
+    "TernaryDFA",
     "FlipTernary",
     "FlipFeedback",
     "StructuredFeedback",

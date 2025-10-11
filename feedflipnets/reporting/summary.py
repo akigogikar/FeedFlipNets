@@ -32,7 +32,7 @@ def _extract_numeric(
     metrics: dict[str, list[float]] = {}
     for record in records:
         for key, value in record.items():
-            if key == "step":
+            if key in {"step", "epoch"}:
                 continue
             if isinstance(value, (int, float)):
                 metrics.setdefault(key, []).append(float(value))

@@ -23,9 +23,10 @@ make smoke
 ls runs/basic-dfa-cpu
 ```
 
-`make smoke` writes `metrics.jsonl`, `metrics.csv`, `manifest.json`, and plots
-(when enabled) under `runs/basic-dfa-cpu/`. Running the command twice yields
-identical metrics hashes thanks to deterministic seeds.
+`make smoke` writes `metrics_train.jsonl`, `metrics_val.jsonl`,
+`metrics_test.json`, split CSV files, checkpoints, and `manifest.json` under
+`runs/basic-dfa-cpu/`. Running the command twice yields identical metrics hashes
+thanks to deterministic seeds.
 
 ## CLI usage
 
@@ -42,6 +43,25 @@ configuration; otherwise it patches the selected preset. The CLI exports the
 resolved configuration, including the offline flag, to the pipeline. When
 `FEEDFLIP_DATA_OFFLINE=1` (default) no network calls are attempted; fixtures are
 generated locally via the cache manifest.
+
+### Training & evaluation controls
+
+The upgraded trainer is modality-aware and automatically selects sensible
+defaults for each dataset type. You can override the behaviour from the CLI:
+
+- `--loss {auto,mse,mae,huber,ce,bce}` selects the loss function (auto uses the
+  dataset task type).
+- `--metrics default` or a comma-separated list (e.g. `accuracy,macro_f1`) drives
+  the per-split evaluation.
+- `--feedback {flip,dfa,structured,backprop,ternary_dfa}` swaps feedback
+  strategies while keeping the legacy names available.
+- `--ternary {off,per_step,per_epoch}` and `--ternary-threshold` control the
+  quantisation schedule.
+- `--eval-every` and `--early-stopping-patience` enable validation-driven early
+  stopping and periodic evaluation.
+
+Each run prints a concise startup summary with dataset, inferred dimensions,
+loss/metric selections, feedback strategy, ternary mode, and parameter count.
 
 ### Datasets & offline fixtures
 
@@ -123,11 +143,13 @@ network calls.
 
 ## Reporting artefacts
 
-`feedflipnets.reporting.metrics.JsonlSink` records `{step, split, loss,
-accuracy, seed, sha}` entries alongside additional float metrics. The
-`CsvSink` mirrors the schema for spreadsheet workflows. `PlotAdapter` writes
-loss curves using the Agg backend so that CI remains headless. Manifests include
-Git SHA, dataset provenance (with checksums), and runtime environment details.
+`feedflipnets.reporting.metrics.JsonlSink` records per-epoch metrics for each
+split (`metrics_train.jsonl`, `metrics_val.jsonl`, `metrics_test.jsonl`). The
+`CsvSink` mirrors the schema for spreadsheet workflows. A compact
+`metrics_test.json` captures the last test metrics, while `best.ckpt` and
+`last.ckpt` store model weights for reproducibility. `PlotAdapter` writes loss
+curves using the Agg backend so that CI remains headless. Manifests include Git
+SHA, dataset provenance (with checksums), and runtime environment details.
 
 ## Legacy shims
 

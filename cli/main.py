@@ -54,6 +54,41 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
         "--enable-plots", action="store_true", help="Enable plotting adapters"
     )
     parser.add_argument(
+        "--feedback",
+        choices=["auto", "flip", "dfa", "structured", "backprop", "ternary_dfa"],
+        help="Override the feedback/learning strategy",
+    )
+    parser.add_argument(
+        "--loss",
+        choices=["auto", "mse", "mae", "huber", "ce", "bce"],
+        help="Override the training loss function",
+    )
+    parser.add_argument(
+        "--metrics",
+        default="default",
+        help="Comma separated list of metrics to compute (or 'default')",
+    )
+    parser.add_argument(
+        "--ternary",
+        choices=["off", "per_step", "per_epoch"],
+        help="Ternary quantisation schedule",
+    )
+    parser.add_argument(
+        "--ternary-threshold",
+        type=float,
+        help="Threshold used for ternary quantisation",
+    )
+    parser.add_argument(
+        "--eval-every",
+        type=int,
+        help="Evaluate validation/test splits every N epochs",
+    )
+    parser.add_argument(
+        "--early-stopping-patience",
+        type=int,
+        help="Number of epochs without improvement before stopping",
+    )
+    parser.add_argument(
         "--offline",
         action=argparse.BooleanOptionalAction,
         default=True,
@@ -179,6 +214,21 @@ def main(argv: Iterable[str] | None = None) -> None:
 
     if args.enable_plots:
         config.setdefault("train", {})["enable_plots"] = True
+
+    if args.feedback and args.feedback != "auto":
+        config.setdefault("model", {})["strategy"] = args.feedback
+    if args.loss:
+        config.setdefault("train", {})["loss"] = args.loss
+    if args.metrics and args.metrics != "default":
+        config.setdefault("train", {})["metrics"] = args.metrics
+    if args.ternary:
+        config.setdefault("train", {})["ternary"] = args.ternary
+    if args.ternary_threshold is not None:
+        config.setdefault("train", {})["ternary_threshold"] = args.ternary_threshold
+    if args.eval_every is not None:
+        config.setdefault("train", {})["eval_every"] = args.eval_every
+    if args.early_stopping_patience is not None:
+        config.setdefault("train", {})["early_stopping_patience"] = args.early_stopping_patience
 
     config["offline"] = bool(args.offline)
 
