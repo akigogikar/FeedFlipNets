@@ -12,16 +12,33 @@ from ..cache import fetch
 from ..registry import DatasetSpec, register_dataset
 
 _URL = "https://storage.googleapis.com/tf-keras-datasets/mnist.npz"
-_CHECKSUM = "fe63ad0f25b57d1097017e6636e2e3b5676d8d2d1b59f2ce20c06e5581eabea2"
+_CHECKSUM = "8ecf920312e1afce37bc2c6c96142e1698af7837f2ca82bb28d5f633cb3517a2"
 
 
 def _build_offline_fixture(path: Path) -> None:
-    rng = np.random.default_rng(123)
-    train_x = rng.integers(0, 256, size=(256, 784), dtype=np.uint8)
-    train_y = rng.integers(0, 10, size=(256,), dtype=np.uint8)
-    test_x = rng.integers(0, 256, size=(64, 784), dtype=np.uint8)
-    test_y = rng.integers(0, 10, size=(64,), dtype=np.uint8)
-    np.savez(path, X_train=train_x, y_train=train_y, X_test=test_x, y_test=test_y)
+    """Build a deterministic MNIST-like fixture for offline use."""
+
+    # The previous implementation relied on ``np.random.default_rng`` which
+    # produces different streams across NumPy releases (notably 1.26 vs 2.0).
+    # That meant the serialized ``.npz`` archive changed depending on the
+    # Python/NumPy combo that built it, leading to checksum mismatches in CI.
+    #
+    # To make the fixture stable we generate the data procedurally using plain
+    # ``np.arange`` and modular arithmetic.  Everything is derived from simple
+    # integer sequences, so the resulting arrays – and therefore the archive –
+    # are bit-for-bit identical across platforms and NumPy versions.
+    train_x = np.arange(256 * 784, dtype=np.uint32).reshape(256, 784) % 256
+    train_y = np.arange(256, dtype=np.uint8) % 10
+    test_x = np.arange(64 * 784, dtype=np.uint32).reshape(64, 784)[::-1] % 256
+    test_y = np.arange(64, dtype=np.uint8)[::-1] % 10
+
+    np.savez(
+        path,
+        X_train=train_x.astype(np.uint8),
+        y_train=train_y,
+        X_test=test_x.astype(np.uint8),
+        y_test=test_y,
+    )
 
 
 def _prepare(
