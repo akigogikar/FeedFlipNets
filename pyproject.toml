@@ -22,3 +22,6 @@ dev = ["pytest"]
 
 [tool.setuptools]
 py-modules = ["ternary_dfa_experiment"]
+
+[tool.setuptools.packages.find]
+include = ["feedflipnets", "feedflipnets.*", "cli", "cli.*"]
