@@ -24,8 +24,10 @@ def normalize(data: np.ndarray, axis=None) -> np.ndarray:
     return (data - mean) / std
 
 
-def batch_iter(data: np.ndarray, labels: np.ndarray, batch_size: int) -> Iterable[Tuple[np.ndarray, np.ndarray]]:
+def batch_iter(
+    data: np.ndarray, labels: np.ndarray, batch_size: int
+) -> Iterable[Tuple[np.ndarray, np.ndarray]]:
     """Simple batch iterator."""
     n = data.shape[0]
     for i in range(0, n, batch_size):
-        yield data[i:i + batch_size], labels[i:i + batch_size]
+        yield data[i : i + batch_size], labels[i : i + batch_size]

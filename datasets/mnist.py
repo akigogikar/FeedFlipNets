@@ -13,7 +13,9 @@ from .utils import normalize
 _DEF_PATH = os.path.join("datasets_cache", "mnist.npz")
 
 
-def load_mnist(path: str = _DEF_PATH) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def load_mnist(
+    path: str = _DEF_PATH,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Download (if needed) and return MNIST as numpy arrays."""
     if os.path.exists(path):
         with np.load(path) as f:

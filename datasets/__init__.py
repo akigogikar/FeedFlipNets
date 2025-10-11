@@ -6,6 +6,10 @@ from .tinystories import load_tinystories
 from .utils import normalize, batch_iter, download_file
 
 __all__ = [
-    "load_mnist", "load_ucr", "load_tinystories",
-    "normalize", "batch_iter", "download_file",
+    "load_mnist",
+    "load_ucr",
+    "load_tinystories",
+    "normalize",
+    "batch_iter",
+    "download_file",
 ]
