@@ -1,178 +1,287 @@
-# FeedFlipNets
+FeedFlipNets
+===========
 
-![CI](https://github.com/akigogikar/FeedFlipNets/actions/workflows/ci.yml/badge.svg)
+DFA-trained Ternary Networks for Edge-Ready, Low-Precision Deep Learning
 
-**FeedFlipNets – DFA-trained Ternary Networks for Edge-Ready, Low-Precision Deep Learning.**
+One-liner: Feedback (Direct Feedback Alignment) + Flip (ternary forward weights) = FeedFlip — a pragmatic toolkit for training accurate, hardware-friendly neural nets without full backprop’s symmetry constraints.
 
-## What is FeedFlipNets?
 
-FeedFlipNets is a lightweight research library for DFA-trained ternary neural
-networks. It combines Direct Feedback Alignment—which replaces symmetric weight
-transport with fixed random feedback matrices—with ternary weight quantisation
-{−1, 0, +1} to deliver low-precision, hardware-friendly training without full
-backprop’s constraints. Use it to prototype edge-ready models, study
-biologically plausible learning, and compare DFA vs. BP under aggressive
-quantisation. “Flip” refers strictly to ternary weight states in the forward
-path; feedback matrices stay fixed and random as dictated by DFA.
+⸻
 
-## Why it matters
+Why FeedFlipNets
+----------------
 
-- **Edge ML efficiency.** Ternary weights slash memory and multiply-accumulate
-  cost, while DFA avoids weight symmetry in the backward pass—ideal for
-  neuromorphic or on-device training explorations.
-- **Research credibility.** DFA is a published alternative to backprop capable
-  of learning in deep networks, and ternary networks are a well studied
-  compression method. FeedFlipNets unifies both for practical experimentation.
+Modern teams need efficient deep learning that actually ships: low power, small memory, predictable behavior. FeedFlipNets does exactly that by combining:
 
-## How “Flip” works
+* **Direct Feedback Alignment (DFA)** — replace backprop’s weight-transpose path with fixed random feedback matrices. This removes the weight transport constraint and simplifies the backward graph.
+* **Ternary weight “flip”** — constrain forward weights to {−1, 0, +1} on a configurable schedule while updating “shadow” float weights under the hood. You keep learning capacity, you gain hardware efficiency.
 
-- Maintain float “shadow” weights `V` for optimisation.
-- Quantise forward weights `W = Qτ(V)` to {−1, 0, +1} on a schedule
-  (`per_step` or `per_epoch`).
-- Backward signals rely on DFA via fixed random matrices `B_l`.
-- Gradients update the float weights; the flip schedule refreshes the ternary
-  forward path.
+Net outcome: simpler training signals, binary/ternary-friendly models, and a clean surface for edge AI and neuromorphic experiments.
 
-## Not what it is
 
-- ❌ Not “sign-flipped feedback.”
-- ✅ “Flip” refers to ternary weight states; feedback remains random fixed
-  matrices (DFA).
+⸻
 
-The library bundles deterministic offline fixtures, manifest-driven artefacts,
-and a CLI so that classification, regression, and text workloads can run
-repeatably on a laptop or in CI without network access.
+What you get
+------------
 
-**Keywords:** Direct Feedback Alignment, DFA, feedback alignment, ternary weight
-networks, binary/ternary neural networks, quantised neural networks,
-low-precision training, edge AI, neuromorphic learning, hardware-friendly deep
-learning.
+* **Drop-in training strategies:** backprop, dfa, structured feedback, and FeedFlip (dfa + ternary forward).
+* **Low-precision knobs:** flip thresholds, deterministic/stochastic ternarization, and scheduling (per-step or per-epoch).
+* **Determinism by design:** seeds, fixtures, and smoke tests for CI.
+* **Small, readable codepaths:** great for experimentation, pedagogy, and fast iteration.
+* **No GPU required:** CPU-friendly NumPy-first approach (works anywhere you can run Python).
 
-## Quickstart
+Straight talk: FeedFlip optimizes practical efficiency and deployability, not leaderboard SOTA. Expect excellent footprint and stability; do not expect it to beat full-precision backprop on very large benchmarks out of the box.
+
+
+⸻
+
+How it works (at a glance)
+--------------------------
+
+Forward: use flipped (ternary) weights $W_l = Q_\tau(V_l)$ derived from float “shadow” weights $V_l$.
+
+Backward (DFA): project output error with fixed matrices $B_l$:
+
+$$
+\delta_l = (B_l e) \odot f'(h_l)
+$$
+
+Update: compute $\nabla V_l$ with the usual local rule and step the optimizer. Refresh $W_l$ per your flip schedule.
+
+This separation lets you train with simple, fixed feedback while keeping the forward path quantized and deployable.
+
+
+⸻
+
+Installation
+------------
 
 ```bash
-# 1. Install pinned dependencies into a virtual environment
-make setup
+# From source (recommended)
+git clone https://github.com/akigogikar/FeedFlipNets.git
+cd FeedFlipNets
+python -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\activate
+pip install -U pip
+pip install -e .
+```
 
-# 2. Run formatting, linting, tests, and the offline smoke suite
+Requirements: Python 3.8+ plus NumPy, matplotlib, pandas, scikit-learn, and PyYAML (see `pyproject.toml` / `requirements-lock.txt` for exact pins).
+
+
+⸻
+
+Quickstart (use the smoke tests)
+--------------------------------
+
+The fastest path to value is to run the smoke tests. They validate the end-to-end training loop with small, deterministic datasets.
+
+```bash
+# Option A: run the whole smoke suite (datasets, trainer, CLI)
+pytest -q tests/test_datasets_smoke.py tests/test_training_loops.py tests/integration/test_cli.py
+
+# Option B: run a single scenario
+pytest -q tests/integration/test_cli.py::test_cli_basic_preset
+```
+
+What to expect:
+
+* A tiny model trains for a few epochs.
+* Metrics (loss/accuracy) write into `runs/` alongside manifests.
+* Runs are deterministic with the shipped seeds and offline fixtures.
+
+
+⸻
+
+Usage patterns
+--------------
+
+1. **CLI presets (recommended for teams)**
+
+   Presets let you snap together dataset + model + feedback + flip schedule without touching code.
+
+   ```bash
+   # Example: DFA + ternary forward on the MNIST offline fixture
+   python -m cli.main \
+     --preset mnist_mlp_dfa \
+     --feedback dfa \
+     --flip ternary \
+     --flip-schedule per_step \
+     --flip-threshold 0.05
+   ```
+
+   Prefer `make run PRESET=<name>` if you want an even shorter command (`make run PRESET=mnist_mlp_dfa`).
+
+2. **Python API (for experiments)**
+
+   ```python
+   from pathlib import Path
+
+   import numpy as np
+
+   from feedflipnets.core.strategies import DFA
+   from feedflipnets.data.registry import get_dataset
+   from feedflipnets.training.trainer import FeedForwardModel, SGDOptimizer, Trainer
+
+   rng = np.random.default_rng(0)
+   spec = get_dataset("mnist", offline=True, cache_dir=Path(".cache"))
+   train_loader = spec.loader("train", batch_size=32)
+
+   model = FeedForwardModel([784, 256, 10], tau=0.05, quant="det", seed=0)
+   strategy = DFA(rng)
+   optimizer = SGDOptimizer(lr=0.05)
+
+   trainer = Trainer(model=model, strategy=strategy, optimizer=optimizer)
+   result = trainer.run(
+       train_loader,
+       epochs=10,
+       seed=0,
+       steps_per_epoch=spec.splits["train"] // 32,
+       task_type="multiclass",
+       num_classes=10,
+       flip="ternary",
+       flip_schedule="per_step",
+       checkpoint_dir=Path("runs/example"),
+   )
+
+   print(result.metrics_path)
+   ```
+
+   Swap in `feedflipnets.core.strategies.Backprop()` or `feedflipnets.core.strategies.TernaryDFA(...)` to explore other feedback paths.
+
+
+⸻
+
+Configuration surface
+---------------------
+
+Key toggles you’ll expose in code/CLI:
+
+* `--feedback {backprop, dfa, ternary_dfa, structured}`
+* `--flip {off, ternary}`
+* `--flip-schedule {per_step, per_epoch}`
+* `--flip-threshold <float>` (ternary threshold)
+* `--seed <int>`
+* Optimizer hyperparameters via config files (`train.lr`, `train.batch_size`, etc.)
+* Dataset and model size flags (hidden units, depth, activation) via presets/config overrides.
+
+
+⸻
+
+Datasets & tasks
+----------------
+
+* **Vision:** MNIST-scale offline fixture (`mnist_mlp_dfa` preset).
+* **Time series:** UCR GunPoint offline fixture (`ucr_gunpoint_mlp_dfa`).
+* **Tabular regression:** California Housing offline fixture (`california_housing_mlp_dfa`).
+* **Text:** 20 Newsgroups hashing-vectorized offline fixture (`20newsgroups_bow_mlp_dfa`).
+* **CSV helpers:** `csv_regression` / `csv_classification` loaders for custom experiments.
+
+Each preset lives under `configs/presets/` and works fully offline unless you pass `--offline false` or clear the `FEEDFLIP_DATA_OFFLINE` environment variable.
+
+
+⸻
+
+Performance posture (managing expectations)
+-------------------------------------------
+
+* **Convergence:** DFA + ternary typically requires more epochs vs. full-precision backprop.
+* **Footprint:** Ternary forward weights and simple feedback paths make the approach edge-deployable and hardware-amenable.
+* **Determinism:** Reproducible by default (seeded in data shuffles, init, and feedback matrices).
+
+Add your own smoke-test metrics table once you have results to share.
+
+
+⸻
+
+FAQ
+----
+
+**Is “Flip” about the feedback path?**
+
+No. “Flip” refers to ternary forward weights only. Feedback remains DFA with fixed random matrices.
+
+**Why ternary and not binary?**
+
+Ternary often hits a better accuracy/efficiency frontier while preserving the low-precision benefits.
+
+**Can I turn off quantization?**
+
+Yes—set `--flip off` (or the equivalent API flag) to run pure DFA or backprop.
+
+**Do I need a GPU?**
+
+No. CPU is fine for the supported experiments and smoke tests.
+
+
+⸻
+
+Roadmap
+-------
+
+* Optional binary feedback matrices (±1) with variance scaling.
+* Structured feedback (e.g., orthogonal/Hadamard) for stability.
+* Plug-in quantizers (LSQ, DoReFa) and per-layer thresholds.
+* Exporters for on-device inference formats.
+
+Update these bullets as plans evolve.
+
+
+⸻
+
+SEO keywords (for GitHub/Google)
+--------------------------------
+
+Direct Feedback Alignment, DFA, Feedback Alignment, ternary weight networks, binary neural networks, quantized neural networks, low-precision training, efficient deep learning, edge AI, on-device learning, neuromorphic learning, random feedback matrices, hardware-friendly deep learning.
+
+
+⸻
+
+Contributing
+------------
+
+PRs welcome. Please run the smoke suite locally before submitting.
+
+```bash
+# Lint + tests
 make format lint test smoke
-
-# 3. Launch a preset end-to-end run (defaults to offline fixtures)
-make run PRESET=mnist_mlp_dfa
 ```
 
-Each modality ships with an end-to-end preset under `configs/presets/`:
+Add `ruff`, `black`, `mypy`, or pre-commit hooks here if your workflow uses them.
 
-| Modality            | Command                                                      | Notes |
-| ------------------- | ------------------------------------------------------------- | ----- |
-| Vision (MNIST)      | `make run PRESET=mnist_mlp_dfa`                               | Two hidden layers, DFA, ternary flip per-step |
-| Time series (UCR)   | `make run PRESET=ucr_gunpoint_mlp_dfa`                        | GunPoint offline fixture, DFA |
-| Tabular regression  | `make run PRESET=california_housing_mlp_dfa`                  | California Housing synthetic regression, flip off |
-| Text (20 Newsgroups)| `make run PRESET=20newsgroups_bow_mlp_dfa`                    | HashingVectorizer features, DFA |
 
-Presets declare dataset parameters, model topology, feedback strategy, flip
-mode, optimiser, learning rate, epochs, batch size, and evaluation cadence. All
-runs write manifests, JSONL metrics, CSV summaries, and checkpoints inside the
-configured `train.run_dir`.
+⸻
 
-### CLI flag summary
+Citation
+--------
 
-- `--feedback {backprop, dfa, ternary_dfa, structured}`
-- `--flip {off, ternary}` with `--flip-schedule {per_step, per_epoch}`
-- `--flip-threshold τ` to control the ternary quantisation boundary
+If this work helps your research or product, please cite:
 
-### Sweeps in one command
-
-Grid sweeps over feedback strategy, flip options, learning rate, and hidden
-widths can be launched with:
-
-```bash
-python -m scripts.preset_sweep --preset mnist_mlp_dfa \
-  --feedback backprop dfa ternary_dfa \
-  --flip off ternary \
-  --flip-schedule per_step per_epoch \
-  --lr 0.1 0.01 \
-  --hidden 128 256
+```bibtex
+@software{FeedFlipNets,
+  author = {Gogikar, A.},
+  title  = {FeedFlipNets: DFA-trained Ternary Networks for Efficient Deep Learning},
+  year   = {2025},
+  url    = {https://github.com/akigogikar/FeedFlipNets}
+}
 ```
 
-The script clones the preset configuration, adjusts the requested knobs, and
-stores each run under `runs/sweeps/<preset>/feedback-.../`.
+Swap in a paper or arXiv entry once available.
 
-## FAQ
 
-### Does FeedFlip flip the feedback weights?
+⸻
 
-No. “Flip” is forward-path ternarisation only. The feedback path is DFA with
-fixed random matrices.
+License
+-------
 
-### Why ternary instead of binary?
+Apache-2.0 © Aki Gogikar
 
-Ternary weights strike a better accuracy/efficiency trade-off than pure binary,
-while keeping most of the compute and memory savings.
 
-### Is this credible beyond toy tasks?
+⸻
 
-DFA has been shown to learn in deep architectures and has modern variants;
-ternary and binary networks have extensive literature and real hardware appeal.
-FeedFlipNets unifies both for practical experimentation.
+Drop-in checklist for maintainers
+---------------------------------
 
-## Straight talk on trade-offs
-
-You’re optimising for training simplicity and hardware realism, not SOTA
-accuracy. Expect more epochs vs. BP in some settings—the known cost of DFA and
-aggressive quantisation. The win is a clean experimental surface to study
-low-precision learning and error-transport alternatives with minimal moving
-parts.
-
-## Dataset modes
-
-FeedFlipNets datasets default to deterministic offline fixtures so smoke tests
-never touch the network. Switching to the real datasets is as simple as passing
-`--no-offline` or setting `FEEDFLIP_DATA_OFFLINE=0`.
-
-| Dataset              | Offline fixture characteristics                               | Online toggle |
-| -------------------- | ------------------------------------------------------------- | ------------- |
-| `mnist`              | Linearly separable synthetic digits (10×64 samples)           | `--no-offline` downloads the classic MNIST archive |
-| `ucr`                | Class-specific sinusoid time series with noise                | `--no-offline --ucr-name <dataset>` pulls from UCR/UEA |
-| `california_housing` | Linear regression with Gaussian noise, standardised features  | `--no-offline` fetches via scikit-learn |
-| `20newsgroups`       | Sparse hashing-vectorised pseudo-documents per class          | `--no-offline --text-subset train` streams from scikit-learn |
-
-Additional CSV helpers and custom datasets are documented in
-[`docs/how_to_add_dataset.md`](docs/how_to_add_dataset.md).
-
-## Losses, metrics, and flip support
-
-| Task type      | Default loss (`--loss auto`) | Default metrics        | Flip mode (`--flip`) | Flip schedule (`--flip-schedule`) | Feedback strategies (`--feedback`) |
-| -------------- | ---------------------------- | ---------------------- | -------------------- | --------------------------------- | ---------------------------------- |
-| Regression     | MSE                          | `mae`, `mse`           | `off`, `ternary`     | `off`, `per_epoch`, `per_step`    | `backprop`, `dfa`, `ternary_dfa`   |
-| Multiclass     | Cross-entropy                | `accuracy`, `macro_f1` | `off`, `ternary`     | `off`, `per_step`                 | `backprop`, `dfa`, `ternary_dfa`   |
-| Binary         | BCE                          | `accuracy`, `auc`      | `off`, `ternary`     | `off`, `per_step`                 | `backprop`, `dfa`, `ternary_dfa`   |
-
-The trainer chooses defaults based on the dataset metadata but every preset can
-override them in its YAML/JSON. CLI flags mirror the config keys for interactive
-experimentation.
-
-## Reproducibility checklist
-
-- Every preset specifies `train.seed`; the trainer derives deterministic child
-  seeds for validation/test loaders and quantisation.
-- `manifest.json` captures the resolved configuration, dataset provenance, and
-  package versions so runs can be replayed later.
-- Metrics are written as JSONL (`metrics_<split>.jsonl`) and CSV files alongside
-  a snapshot of the last test metrics (`metrics_test.json`).
-- `make smoke` replays all presets offline and is wired into CI, guaranteeing
-  end-to-end coverage on clean clones.
-
-## Tooling
-
-- `make setup` — create a virtual environment, install pinned dependencies, and
-  register pre-commit hooks.
-- `make format` / `make lint` — run `isort`, `black`, `ruff`, and `flake8` over
-  `cli/`, `feedflipnets/`, `scripts/`, and `tests/`.
-- `make test` — execute the offline pytest suite.
-- `make smoke` — execute all presets offline, writing metrics to `runs/`.
-- `.pre-commit-config.yaml` — standardises formatting, linting, and whitespace
-  hygiene before committing.
-
-Refer to [`CONTRIBUTING.md`](CONTRIBUTING.md) for coding standards and release
-policies.
+* Replace placeholders with fresh metrics or CLI shortcuts as the project matures.
+* Confirm Python version and dependency pins.
+* Add one tiny metrics table from a smoke run (before/after flip) to make the README “pop.”
+* If you have CI, wire the badge to your workflow URL.
