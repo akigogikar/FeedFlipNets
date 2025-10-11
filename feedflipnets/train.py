@@ -57,16 +57,55 @@ def _infer_dims(data_cfg: Dict[str, object]) -> Tuple[int, int]:
     return batch.inputs.shape[1], batch.targets.shape[1]
 
 
+_DEFAULT_METHOD = {"strategy": "dfa", "flip": "ternary", "flip_schedule": "per_step"}
+
+
 _METHOD_MAP = {
-    "Backprop": {"strategy": "backprop", "flip": "off", "flip_schedule": "off"},
-    "Vanilla DFA": {"strategy": "dfa", "flip": "ternary", "flip_schedule": "per_step"},
-    "Structured DFA": {"strategy": "dfa", "flip": "ternary", "flip_schedule": "per_step"},
-    "Ternary static Δ": {"strategy": "dfa", "flip": "ternary", "flip_schedule": "per_step"},
-    "Ternary + adaptive + ortho B": {"strategy": "dfa", "flip": "ternary", "flip_schedule": "per_step"},
-    "Ternary + adaptive + ortho B + cal": {"strategy": "dfa", "flip": "ternary", "flip_schedule": "per_step"},
-    "+Shadow": {"strategy": "dfa", "flip": "ternary", "flip_schedule": "per_step"},
-    "+Momentum": {"strategy": "dfa", "flip": "ternary", "flip_schedule": "per_step"},
-    "Ternary DFA on Transformer/LLM": {"strategy": "dfa", "flip": "ternary", "flip_schedule": "per_step"},
+    "Backprop": {
+        "strategy": "backprop",
+        "flip": "off",
+        "flip_schedule": "off",
+    },
+    "Vanilla DFA": {
+        "strategy": "dfa",
+        "flip": "ternary",
+        "flip_schedule": "per_step",
+    },
+    "Structured DFA": {
+        "strategy": "dfa",
+        "flip": "ternary",
+        "flip_schedule": "per_step",
+    },
+    "Ternary static Δ": {
+        "strategy": "dfa",
+        "flip": "ternary",
+        "flip_schedule": "per_step",
+    },
+    "Ternary + adaptive + ortho B": {
+        "strategy": "dfa",
+        "flip": "ternary",
+        "flip_schedule": "per_step",
+    },
+    "Ternary + adaptive + ortho B + cal": {
+        "strategy": "dfa",
+        "flip": "ternary",
+        "flip_schedule": "per_step",
+    },
+    "+Shadow": {
+        "strategy": "dfa",
+        "flip": "ternary",
+        "flip_schedule": "per_step",
+    },
+    "+Momentum": {
+        "strategy": "dfa",
+        "flip": "ternary",
+        "flip_schedule": "per_step",
+    },
+    "Ternary DFA on Transformer/LLM": {
+        "strategy": "dfa",
+        "flip": "ternary",
+        "flip_schedule": "per_step",
+    },
 }
 
 
@@ -89,7 +128,7 @@ def train_single(
     data_cfg = _dataset_options(dataset, freq, max_points, seed)
     d_in, d_out = _infer_dims(data_cfg)
     hidden = [16] * max(depth, 1)
-    mapping = _METHOD_MAP.get(method, {"strategy": "dfa", "flip": "ternary", "flip_schedule": "per_step"})
+    mapping = _METHOD_MAP.get(method, _DEFAULT_METHOD)
     strategy = mapping.get("strategy", "dfa")
 
     config = {
@@ -124,7 +163,10 @@ def train_single(
             record = json.loads(line)
             losses.append(float(record.get("loss", 0.0)))
     auc = float(_trapezoid(losses)) if losses else 0.0
-    t01 = next((idx for idx, loss in enumerate(losses) if loss < 0.01), epochs + 1)
+    t01 = next(
+        (idx for idx, loss in enumerate(losses) if loss < 0.01),
+        epochs + 1,
+    )
     return losses, auc, t01
 
 
