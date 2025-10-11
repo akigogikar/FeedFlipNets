@@ -138,7 +138,11 @@ def test_binary_metrics_and_checkpoints(tmp_path, flip_schedule: str) -> None:
 
     ckpt_dir = tmp_path / flip_schedule
     ckpt_dir.mkdir()
-    run_kwargs = {"flip": "off"} if flip_schedule == "off" else {"flip": "ternary", "flip_schedule": flip_schedule}
+    run_kwargs = (
+        {"flip": "off"}
+        if flip_schedule == "off"
+        else {"flip": "ternary", "flip_schedule": flip_schedule}
+    )
     trainer.run(
         loader,
         epochs=25,
