@@ -1,3 +1,4 @@
+# ruff: noqa: E402  # imports may appear after code in this script
 """
 Ternary-DFA Experiment Script  (v8.2 – complete logging + plots + extra metrics)
 ================================================================================
@@ -35,16 +36,24 @@ from feedflipnets.train import sweep_and_log
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Run Ternary-DFA experiment")
-    p.add_argument('--methods', nargs='+', default=['Backprop'])
-    p.add_argument('--depths', type=int, nargs='+', required=True)
-    p.add_argument('--freqs', type=int, nargs='+', required=True)
-    p.add_argument('--epochs', type=int, default=500)
-    p.add_argument('--outdir', type=str, default='results')
-    p.add_argument('--seeds', type=int, nargs='+', default=[0])
-    p.add_argument('--dataset', type=str, default=None,
-                   help='Dataset to use (mnist, tinystories or ucr:<name>)')
-    p.add_argument('--max-points', type=int, default=None,
-                   help='Limit dataset to this many points for quick runs')
+    p.add_argument("--methods", nargs="+", default=["Backprop"])
+    p.add_argument("--depths", type=int, nargs="+", required=True)
+    p.add_argument("--freqs", type=int, nargs="+", required=True)
+    p.add_argument("--epochs", type=int, default=500)
+    p.add_argument("--outdir", type=str, default="results")
+    p.add_argument("--seeds", type=int, nargs="+", default=[0])
+    p.add_argument(
+        "--dataset",
+        type=str,
+        default=None,
+        help="Dataset to use (mnist, tinystories or ucr:<name>)",
+    )
+    p.add_argument(
+        "--max-points",
+        type=int,
+        default=None,
+        help="Limit dataset to this many points for quick runs",
+    )
     return p.parse_args()
 
 
@@ -63,5 +72,5 @@ def main(args: argparse.Namespace | None = None) -> None:
     )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

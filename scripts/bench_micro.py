@@ -8,14 +8,16 @@ from feedflipnets.core.np_mlp import train_one
 
 STRATS = ["bp", "dfa", "flip"]
 
+
 def _fmt_mu_sigma(vals):
     mu = mean(vals)
     sd = pstdev(vals) if len(vals) > 1 else 0.0
     return f"{mu:.4f} ± {sd:.4f}"
 
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--seeds", nargs="+", type=int, default=[123,124,125])
+    ap.add_argument("--seeds", nargs="+", type=int, default=[123, 124, 125])
     ap.add_argument("--steps", type=int, default=64)
     ap.add_argument("--lr", type=float, default=0.05)
     ap.add_argument("--batch", type=int, default=64)
@@ -29,7 +31,9 @@ def main():
         for s in args.seeds:
             r = train_one(strat, seed=s, steps=args.steps, lr=args.lr, batch=args.batch)
             runs.append({"strategy": strat, "seed": s, **r})
-    (out / "results.jsonl").write_text("\n".join(json.dumps(x) for x in runs), encoding="utf-8")
+    (out / "results.jsonl").write_text(
+        "\n".join(json.dumps(x) for x in runs), encoding="utf-8"
+    )
 
     agg = {}
     for strat in STRATS:
@@ -49,28 +53,54 @@ def main():
     csv_path = out / "bench_micro.csv"
     with csv_path.open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["strategy","seeds","steps","final_loss_mu","final_loss_sd","final_acc_mu","final_acc_sd","delta_acc_vs_bp"])
+        w.writerow(
+            [
+                "strategy",
+                "seeds",
+                "steps",
+                "final_loss_mu",
+                "final_loss_sd",
+                "final_acc_mu",
+                "final_acc_sd",
+                "delta_acc_vs_bp",
+            ]
+        )
         for strat in STRATS:
             a = agg[strat]
-            w.writerow([strat, a["n"], args.steps,
-                        f"{a['final_loss_mu']:.4f}", f"{a['final_loss_sd']:.4f}",
-                        f"{a['final_acc_mu']:.4f}", f"{a['final_acc_sd']:.4f}",
-                        f"{a['delta_acc_vs_bp']:.4f}"])
+            w.writerow(
+                [
+                    strat,
+                    a["n"],
+                    args.steps,
+                    f"{a['final_loss_mu']:.4f}",
+                    f"{a['final_loss_sd']:.4f}",
+                    f"{a['final_acc_mu']:.4f}",
+                    f"{a['final_acc_sd']:.4f}",
+                    f"{a['delta_acc_vs_bp']:.4f}",
+                ]
+            )
 
     md_path = out / "bench_micro.md"
     lines = []
     lines.append("### Micro‑Benchmark: Backprop vs DFA vs Flip‑Ternary (offline)")
     lines.append("")
-    lines.append(f"- Seeds: `{args.seeds}`; Steps: `{args.steps}`; LR: `{args.lr}`; Batch: `{args.batch}`")
+    lines.append(
+        f"- Seeds: `{args.seeds}`; Steps: `{args.steps}`; LR: `{args.lr}`; Batch: `{args.batch}`"
+    )
     lines.append("")
-    lines.append("| Strategy | Final Loss (μ±σ) | Final Acc (μ±σ) | ΔAcc vs BP | Seeds | Steps |")
+    lines.append(
+        "| Strategy | Final Loss (μ±σ) | Final Acc (μ±σ) | ΔAcc vs BP | Seeds | Steps |"
+    )
     lines.append("|---|---:|---:|---:|---:|---:|")
     for strat in STRATS:
         fl = [r["final_loss"] for r in runs if r["strategy"] == strat]
         fa = [r["final_acc"] for r in runs if r["strategy"] == strat]
-        lines.append(f"| {strat.upper()} | {_fmt_mu_sigma(fl)} | {_fmt_mu_sigma(fa)} | {agg[strat]['delta_acc_vs_bp']:+.4f} | {agg[strat]['n']} | {args.steps} |")
+        lines.append(
+            f"| {strat.upper()} | {_fmt_mu_sigma(fl)} | {_fmt_mu_sigma(fa)} | {agg[strat]['delta_acc_vs_bp']:+.4f} | {agg[strat]['n']} | {args.steps} |"
+        )
     md_path.write_text("\n".join(lines), encoding="utf-8")
     print("Wrote:", csv_path, md_path)
+
 
 if __name__ == "__main__":
     main()

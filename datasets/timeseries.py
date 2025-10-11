@@ -22,7 +22,9 @@ def _extract_dataset(name: str, root: str) -> str:
     return extract_dir
 
 
-def load_ucr(name: str, root: str = "datasets_cache") -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def load_ucr(
+    name: str, root: str = "datasets_cache"
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Load a dataset from the UCR/UEA archive.
 
     Returns (X_train, y_train, X_test, y_test) arrays normalised per time-series.
