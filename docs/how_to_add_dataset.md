@@ -20,7 +20,7 @@ splits, caching, and batching utilities.
 
 1. Create a preset under `configs/presets/` that references the new dataset.
 2. Specify model `hidden` sizes, `strategy`, optimiser, learning rate, epochs,
-   batch size, ternary schedule, and evaluation cadence.
+   batch size, flip schedule, and evaluation cadence.
 3. Choose a deterministic `train.seed` and assign a unique `train.run_dir`.
 
 Presets appear automatically in `python -m cli.main --list-presets` once added.

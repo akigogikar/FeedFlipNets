@@ -115,14 +115,27 @@ class FlipTernaryStrategy:
         self.tau_frac = tau_frac
 
     def grads(self, X, y, model: MLP):
+        """Compute gradients using ternary-flipped forward weights."""
         y_oh = one_hot(y, model.c)
-        a1, h, p = model.forward(X)
-        grads = _backprop_grads(X, a1, h, p, y_oh, model.params())
-        q = {}
-        for k, g in grads.items():
-            tau = np.percentile(np.abs(g), self.tau_frac * 100.0)
-            q[k] = _ternary(g, tau=tau)
-        return q
+        params = model.params()
+        tau_w1 = np.percentile(np.abs(params["W1"]), self.tau_frac * 100.0)
+        tau_w2 = np.percentile(np.abs(params["W2"]), self.tau_frac * 100.0)
+        W1_flip = _ternary(params["W1"], tau=tau_w1)
+        W2_flip = _ternary(params["W2"], tau=tau_w2)
+        a1 = X @ W1_flip + params["b1"]
+        h = relu(a1)
+        z = h @ W2_flip + params["b2"]
+        p = softmax(z)
+
+        n = X.shape[0]
+        dL_dz = (p - y_oh) / n
+        dW2 = h.T @ dL_dz
+        db2 = dL_dz.sum(axis=0)
+        dL_dh = dL_dz @ W2_flip.T
+        dL_da1 = dL_dh * (a1 > 0)
+        dW1 = X.T @ dL_da1
+        db1 = dL_da1.sum(axis=0)
+        return {"W1": dW1, "b1": db1, "W2": dW2, "b2": db2}
 
 
 def make_dataset(n: int = 512, d: int = 32, seed: int = 123) -> Tuple[Array, Array]:

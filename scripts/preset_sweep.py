@@ -29,10 +29,16 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
         help="Feedback strategies to evaluate",
     )
     parser.add_argument(
-        "--ternary",
+        "--flip",
         nargs="+",
-        default=["off", "per_step"],
-        help="Ternary schedules to evaluate",
+        default=["off", "ternary"],
+        help="Forward flip modes to evaluate",
+    )
+    parser.add_argument(
+        "--flip-schedule",
+        nargs="+",
+        default=["per_step", "per_epoch"],
+        help="Flip refresh schedules to evaluate",
     )
     parser.add_argument(
         "--lr",
@@ -73,56 +79,68 @@ def main(argv: Iterable[str] | None = None) -> None:
     depth = len(base_hidden) if base_hidden else 1
 
     feedback_values = [str(v) for v in args.feedback]
-    ternary_values = [str(v) for v in args.ternary]
+    flip_values = [str(v).lower() for v in args.flip]
+    schedule_values = [str(v).lower() for v in args.flip_schedule]
     lr_values = _parse_float_list(args.lr)
     hidden_values = _parse_int_list(args.hidden)
 
     output_root = Path(args.output_dir) / args.preset
     output_root.mkdir(parents=True, exist_ok=True)
 
-    combinations = itertools.product(feedback_values, ternary_values, lr_values, hidden_values)
+    combinations = itertools.product(feedback_values, flip_values, lr_values, hidden_values)
 
-    for feedback, ternary, lr, hidden in combinations:
-        config = json.loads(json.dumps(base))
-        config["offline"] = not args.online
+    for feedback, flip, lr, hidden in combinations:
+        if feedback == "backprop" or flip == "off":
+            schedules = ["off"]
+        else:
+            schedules = schedule_values
+        for schedule in schedules:
+            config = json.loads(json.dumps(base))
+            config["offline"] = not args.online
 
-        model_cfg = config.setdefault("model", {})
-        train_cfg = config.setdefault("train", {})
+            model_cfg = config.setdefault("model", {})
+            train_cfg = config.setdefault("train", {})
 
-        model_cfg["strategy"] = feedback
-        layer_widths = [hidden for _ in range(max(1, depth))]
-        model_cfg["hidden"] = layer_widths
+            model_cfg["strategy"] = feedback
+            layer_widths = [hidden for _ in range(max(1, depth))]
+            model_cfg["hidden"] = layer_widths
 
-        resolved_ternary = "off" if feedback == "backprop" else ternary
-        train_cfg["ternary"] = resolved_ternary
-        train_cfg["lr"] = float(lr)
+            resolved_flip = "off" if feedback == "backprop" else flip
+            resolved_schedule = "off" if resolved_flip == "off" else schedule
+            train_cfg["flip"] = resolved_flip
+            train_cfg["flip_schedule"] = resolved_schedule
+            train_cfg["lr"] = float(lr)
 
-        run_name = f"feedback-{feedback}_ternary-{resolved_ternary}_lr-{lr:g}_hidden-{hidden}"
-        run_dir = output_root / run_name.replace(".", "p")
-        train_cfg["run_dir"] = str(run_dir)
+            run_name = (
+                f"feedback-{feedback}_flip-{resolved_flip}_schedule-{resolved_schedule}_"
+                f"lr-{lr:g}_hidden-{hidden}"
+            )
+            run_dir = output_root / run_name.replace(".", "p")
+            train_cfg["run_dir"] = str(run_dir)
 
-        payload = {
-            "preset": args.preset,
-            "feedback": feedback,
-            "ternary": resolved_ternary,
-            "lr": lr,
-            "hidden": layer_widths,
-            "run_dir": str(run_dir),
-        }
+            payload = {
+                "preset": args.preset,
+                "feedback": feedback,
+                "flip": resolved_flip,
+                "flip_schedule": resolved_schedule,
+                "lr": lr,
+                "hidden": layer_widths,
+                "run_dir": str(run_dir),
+            }
 
-        if args.dry_run:
-            print(json.dumps({"run": run_name, "config": payload}, sort_keys=True))
-            continue
+            if args.dry_run:
+                print(json.dumps({"run": run_name, "config": payload}, sort_keys=True))
+                continue
 
-        result = pipelines.run_pipeline(config)
-        result_payload = {
-            "run": run_name,
-            "metrics": result.metrics_path,
-            "manifest": result.manifest_path,
-        }
-        if getattr(result, "summary_path", None):
-            result_payload["summary"] = result.summary_path
-        print(json.dumps(result_payload, sort_keys=True))
+            result = pipelines.run_pipeline(config)
+            result_payload = {
+                "run": run_name,
+                "metrics": result.metrics_path,
+                "manifest": result.manifest_path,
+            }
+            if getattr(result, "summary_path", None):
+                result_payload["summary"] = result.summary_path
+            print(json.dumps(result_payload, sort_keys=True))
 
 
 if __name__ == "__main__":

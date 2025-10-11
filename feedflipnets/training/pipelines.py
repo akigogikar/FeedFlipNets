@@ -11,7 +11,9 @@ from typing import Callable, Dict, Iterable, List, Mapping, Sequence
 
 import numpy as np
 
-from ..core.strategies import DFA, Backprop, FlipTernary, StructuredFeedback, TernaryDFA
+import warnings
+
+from ..core.strategies import DFA, Backprop, StructuredFeedback, TernaryDFA
 from ..core.types import Batch, RunResult
 from ..data import registry
 from ..reporting.artifacts import write_manifest
@@ -41,6 +43,8 @@ _PRESETS: Dict[str, Mapping[str, object]] = {
             "lr": 0.03,
             "run_dir": "runs/basic-dfa-cpu",
             "enable_plots": False,
+            "flip": "ternary",
+            "flip_schedule": "per_step",
         },
     },
     "synthetic-min": {
@@ -54,7 +58,7 @@ _PRESETS: Dict[str, Mapping[str, object]] = {
             "hidden": [8],
             "quant": "det",
             "tau": 0.05,
-            "strategy": "flip",
+            "strategy": "dfa",
         },
         "train": {
             "epochs": 1,
@@ -64,6 +68,8 @@ _PRESETS: Dict[str, Mapping[str, object]] = {
             "lr": 0.02,
             "run_dir": "runs/synthetic-min",
             "enable_plots": False,
+            "flip": "ternary",
+            "flip_schedule": "per_step",
         },
     },
     "mnist-flip-det": {
@@ -77,7 +83,7 @@ _PRESETS: Dict[str, Mapping[str, object]] = {
             "hidden": [32],
             "quant": "det",
             "tau": 0.05,
-            "strategy": "flip",
+            "strategy": "dfa",
         },
         "train": {
             "epochs": 1,
@@ -87,6 +93,8 @@ _PRESETS: Dict[str, Mapping[str, object]] = {
             "lr": 0.05,
             "run_dir": "runs/mnist-flip-det",
             "enable_plots": False,
+            "flip": "ternary",
+            "flip_schedule": "per_step",
         },
     },
     "tinystories-dfa-stoch": {
@@ -111,7 +119,7 @@ _PRESETS: Dict[str, Mapping[str, object]] = {
     },
     "depth-frequency-sweep": {
         "sweep": {
-            "methods": ["flip", "dfa"],
+            "methods": ["backprop", "dfa"],
             "depths": [1, 2],
             "freqs": [2, 4],
             "seeds": [0, 1],
@@ -184,6 +192,7 @@ _PRESETS: Dict[str, Mapping[str, object]] = {
 
 _PRESET_DIR = Path(__file__).resolve().parents[2] / "configs" / "presets"
 _FILE_PRESETS_CACHE: Dict[str, Mapping[str, object]] | None = None
+_SKIPPED_PRESETS: set[str] = set()
 
 
 def _read_preset_file(path: Path) -> Mapping[str, object]:
@@ -213,7 +222,17 @@ def _file_presets() -> Dict[str, Mapping[str, object]]:
             for file in sorted(_PRESET_DIR.iterdir()):
                 if file.suffix.lower() not in {".yaml", ".yml", ".json"}:
                     continue
-                data = _read_preset_file(file)
+                try:
+                    data = _read_preset_file(file)
+                except RuntimeError as exc:
+                    if file.name not in _SKIPPED_PRESETS:
+                        warnings.warn(
+                            f"Skipping preset {file.name}: {exc}",
+                            RuntimeWarning,
+                            stacklevel=2,
+                        )
+                        _SKIPPED_PRESETS.add(file.name)
+                    continue
                 required = {"data", "model", "train"}
                 missing = required - set(data)
                 if missing:
@@ -334,10 +353,27 @@ def _train_single(config: Mapping[str, object]) -> RunResult:
     else:
         metrics_list = ",".join(str(item) for item in metrics_cfg)
 
-    ternary_mode = str(train_cfg.get("ternary", "per_step"))
-    ternary_threshold = train_cfg.get("ternary_threshold")
-    if ternary_threshold is not None:
-        model_cfg["tau"] = float(ternary_threshold)
+    flip_type = str(train_cfg.get("flip", "ternary")).lower()
+    legacy_schedule = train_cfg.get("ternary")
+    flip_schedule = train_cfg.get("flip_schedule")
+    if flip_schedule is not None:
+        flip_schedule = str(flip_schedule)
+    if legacy_schedule is not None:
+        warnings.warn(
+            "train.ternary is deprecated; use train.flip_schedule instead.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        flip_schedule = legacy_schedule
+    resolved_schedule = str(flip_schedule or "per_step").lower()
+    if flip_type == "off":
+        resolved_schedule = "off"
+
+    flip_threshold = train_cfg.get("flip_threshold")
+    if flip_threshold is None:
+        flip_threshold = train_cfg.get("ternary_threshold")
+    if flip_threshold is not None:
+        model_cfg["tau"] = float(flip_threshold)
 
     split_sizes = dict(dataset.splits)
     if split_sizes.get("test", 0) == 0:
@@ -374,7 +410,7 @@ def _train_single(config: Mapping[str, object]) -> RunResult:
 
     strategy = _build_strategy(model_cfg, dims, seed)
 
-    run_dir = _resolve_run_dir(train_cfg, dataset.name, model_cfg.get("strategy", "flip"))
+    run_dir = _resolve_run_dir(train_cfg, dataset.name, model_cfg.get("strategy", "dfa"))
     run_dir.mkdir(parents=True, exist_ok=True)
 
     _print_startup_summary(
@@ -382,8 +418,9 @@ def _train_single(config: Mapping[str, object]) -> RunResult:
         dims=dims,
         loss=loss_name,
         metrics=metrics_list,
-        strategy=str(model_cfg.get("strategy", "flip")),
-        ternary_mode=ternary_mode,
+        strategy=str(model_cfg.get("strategy", "dfa")),
+        flip_type=flip_type,
+        flip_schedule=resolved_schedule,
         param_count=sum(dims[i] * dims[i + 1] for i in range(len(dims) - 1)),
     )
 
@@ -436,7 +473,8 @@ def _train_single(config: Mapping[str, object]) -> RunResult:
         metric_names=metrics_list,
         eval_every=eval_every,
         split_loggers=split_loggers,
-        ternary_mode=ternary_mode,
+        flip=flip_type,
+        flip_schedule=resolved_schedule,
         early_stopping_patience=early_stopping,
         checkpoint_dir=run_dir,
     )
@@ -516,11 +554,16 @@ def _build_dims(model_cfg: Mapping[str, object]) -> List[int]:
 
 
 def _build_strategy(model_cfg: Mapping[str, object], dims: Sequence[int], seed: int):
-    name = str(model_cfg.get("strategy", "flip"))
+    name = str(model_cfg.get("strategy", "dfa"))
     rng = np.random.default_rng(seed)
     if name == "flip":
-        refresh = str(model_cfg.get("feedback_refresh", "per_step"))
-        return FlipTernary(refresh=refresh)
+        warnings.warn(
+            "Feedback strategy 'flip' now maps to Direct Feedback Alignment. "
+            "Configure forward ternary quantisation via train.flip/train.flip_schedule.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        name = "dfa"
     if name == "dfa":
         return DFA(rng)
     if name == "ternary_dfa":
@@ -558,7 +601,8 @@ def _print_startup_summary(
     loss: str,
     metrics: str,
     strategy: str,
-    ternary_mode: str,
+    flip_type: str,
+    flip_schedule: str,
     param_count: int,
 ) -> None:
     print("=== FeedFlipNets run ===")
@@ -567,7 +611,8 @@ def _print_startup_summary(
     print(f"Loss          : {loss}")
     print(f"Metrics       : {metrics}")
     print(f"Feedback      : {strategy}")
-    print(f"Ternary mode  : {ternary_mode}")
+    print(f"Flip type     : {flip_type}")
+    print(f"Flip schedule : {flip_schedule}")
     print(f"Parameters    : {param_count}")
     print("========================")
 

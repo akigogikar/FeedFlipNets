@@ -18,5 +18,6 @@ train:
   eval_every: 1
   lr: 0.05
   optimizer: sgd
-  ternary: per_step
+  flip: ternary
+  flip_schedule: per_step
   run_dir: runs/20newsgroups-bow-mlp-dfa

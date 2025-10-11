@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Iterable, Mapping, MutableSequence, Sequence
 
 import numpy as np
+import warnings
 
 from ..core.activations import relu
 from ..core.quant import quantize_ternary_det, quantize_ternary_stoch
@@ -150,7 +151,9 @@ class Trainer:
         metric_names: Sequence[str] | str = (),
         eval_every: int = 1,
         split_loggers: Mapping[str, Sequence[object]] | None = None,
-        ternary_mode: str = "per_step",
+        flip: str = "ternary",
+        flip_schedule: str | None = None,
+        ternary_mode: str | None = None,
         early_stopping_patience: int | None = None,
         checkpoint_dir: str | Path | None = None,
     ) -> RunResult:
@@ -179,9 +182,31 @@ class Trainer:
         self.model.reset(seed)
         state = self.strategy.init(self.model.describe())
         train_steps = steps_per_epoch or self._infer_steps(train_loader)
-        ternary_mode = ternary_mode or "per_step"
-        if ternary_mode not in {"off", "per_step", "per_epoch"}:
-            raise ValueError("ternary_mode must be one of {'off','per_step','per_epoch'}")
+        if ternary_mode is not None:
+            warnings.warn(
+                "`ternary_mode` is deprecated; use `flip_schedule` instead.",
+                DeprecationWarning,
+                stacklevel=3,
+            )
+            if flip_schedule is not None:
+                raise ValueError("Cannot specify both `flip_schedule` and `ternary_mode`.")
+            flip_schedule = ternary_mode
+
+        flip = (flip or "ternary").lower()
+        if flip not in {"off", "ternary"}:
+            raise ValueError("flip must be one of {'off','ternary'}")
+
+        if flip == "off":
+            resolved_schedule = "off"
+        else:
+            resolved_schedule = (flip_schedule or "per_step").lower()
+
+        if resolved_schedule not in {"off", "per_step", "per_epoch"}:
+            raise ValueError(
+                "flip_schedule must be one of {'off','per_step','per_epoch'}"
+            )
+
+        flip_enabled = flip != "off"
 
         best_loss = float("inf")
         best_state: Mapping[str, Array] | None = None
@@ -201,12 +226,13 @@ class Trainer:
                 task_type,
                 num_classes,
                 training=True,
-                ternary_mode=ternary_mode,
+                flip_schedule=resolved_schedule,
+                flip_enabled=flip_enabled,
             )
             total_steps += train_steps
             self._emit_epoch("train", epoch, train_metrics, split_loggers)
 
-            if ternary_mode == "per_epoch":
+            if flip_enabled and resolved_schedule == "per_epoch":
                 self.model.quantise()
 
             should_eval = epoch % max(1, eval_every) == 0
@@ -221,7 +247,8 @@ class Trainer:
                     task_type,
                     num_classes,
                     training=False,
-                    ternary_mode="off",
+                    flip_schedule="off",
+                    flip_enabled=False,
                 )
                 self._emit_epoch("val", epoch, val_metrics, split_loggers)
 
@@ -235,7 +262,8 @@ class Trainer:
                     task_type,
                     num_classes,
                     training=False,
-                    ternary_mode="off",
+                    flip_schedule="off",
+                    flip_enabled=False,
                 )
                 self._emit_epoch("test", epoch, test_metrics, split_loggers)
 
@@ -275,7 +303,8 @@ class Trainer:
         num_classes: int | None,
         *,
         training: bool,
-        ternary_mode: str,
+        flip_schedule: str,
+        flip_enabled: bool,
     ) -> tuple[Mapping[str, float], StrategyState]:
         iterator = iter(loader)
         losses: list[float] = []
@@ -296,7 +325,7 @@ class Trainer:
             if training:
                 grads, current_state = self.strategy.backward(activations, delta, current_state)
                 self.optimizer.step(self.model, grads)
-                if ternary_mode == "per_step":
+                if flip_enabled and flip_schedule == "per_step":
                     self.model.quantise()
         metrics = {"loss": float(np.mean(losses)) if losses else 0.0}
         if preds_all:
