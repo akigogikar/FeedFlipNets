@@ -56,16 +56,26 @@ def _write_methods_stub(
     run_dir = train.get("run_dir", "") if isinstance(train, dict) else ""
     run_id = Path(run_dir).name if run_dir else ""
     tail_window = summary.get("tail_window", 0)
+    dataset_name = (
+        dataset.get("type", dataset.get("name", "unknown"))
+        if isinstance(dataset, dict)
+        else "unknown"
+    )
+    strategy = (
+        model.get("strategy", "unknown") if isinstance(model, dict) else "unknown"
+    )
+    seed = train.get("seed", "unknown") if isinstance(train, dict) else "unknown"
+
     lines = [
         "# Methods",
         "",
         f"- **Run directory**: {run_dir or 'unknown'}",
         f"- **Run ID**: {run_id or 'unknown'}",
-        f"- **Dataset**: {dataset.get('type', dataset.get('name', 'unknown')) if isinstance(dataset, dict) else 'unknown'}",
-        f"- **Strategy**: {model.get('strategy', 'unknown') if isinstance(model, dict) else 'unknown'}",
+        f"- **Dataset**: {dataset_name}",
+        f"- **Strategy**: {strategy}",
         f"- **Steps logged**: {summary.get('records', 0)}",
         f"- **Tail window**: {tail_window}",
-        f"- **Seed**: {train.get('seed', 'unknown') if isinstance(train, dict) else 'unknown'}",
+        f"- **Seed**: {seed}",
         "",
         "This bundle was generated with deterministic settings for reproducibility.",
     ]
