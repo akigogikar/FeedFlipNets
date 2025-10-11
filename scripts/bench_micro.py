@@ -38,9 +38,7 @@ def main():
         for s in args.seeds:
             r = train_one(strat, seed=s, steps=args.steps, lr=args.lr, batch=args.batch)
             runs.append({"strategy": strat, "seed": s, **r})
-    (out / "results.jsonl").write_text(
-        "\n".join(json.dumps(x) for x in runs), encoding="utf-8"
-    )
+    (out / "results.jsonl").write_text("\n".join(json.dumps(x) for x in runs), encoding="utf-8")
 
     agg = {}
     for strat in STRATS:
@@ -97,9 +95,7 @@ def main():
     )
     lines.append(seeds_line)
     lines.append("")
-    lines.append(
-        "| Strategy | Final Loss (μ±σ) | Final Acc (μ±σ) | ΔAcc vs BP | Seeds | Steps |"
-    )
+    lines.append("| Strategy | Final Loss (μ±σ) | Final Acc (μ±σ) | ΔAcc vs BP | Seeds | Steps |")
     lines.append("|---|---:|---:|---:|---:|---:|")
     for strat in STRATS:
         fl = [r["final_loss"] for r in runs if r["strategy"] == strat]

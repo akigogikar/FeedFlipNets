@@ -43,9 +43,7 @@ def test_trainer_pipeline_produces_artifacts(tmp_path, monkeypatch):
         assert fallback == "synthetic"
 
     metrics = [
-        json.loads(line)
-        for line in Path(result.metrics_path).read_text().splitlines()
-        if line
+        json.loads(line) for line in Path(result.metrics_path).read_text().splitlines() if line
     ]
     assert metrics, "metrics should not be empty"
     first = metrics[0]

@@ -47,12 +47,8 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
             else "Experiment name registered in experiments/registry.json"
         ),
     )
-    parser.add_argument(
-        "--config", type=Path, help="Optional JSON/YAML config override"
-    )
-    parser.add_argument(
-        "--enable-plots", action="store_true", help="Enable plotting adapters"
-    )
+    parser.add_argument("--config", type=Path, help="Optional JSON/YAML config override")
+    parser.add_argument("--enable-plots", action="store_true", help="Enable plotting adapters")
     parser.add_argument(
         "--feedback",
         choices=["auto", "flip", "dfa", "structured", "backprop", "ternary_dfa"],
@@ -152,9 +148,7 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="List registered experiments and exit",
     )
-    parser.add_argument(
-        "--dump-config", type=Path, help="Dump the resolved config to a JSON file"
-    )
+    parser.add_argument("--dump-config", type=Path, help="Dump the resolved config to a JSON file")
     return parser.parse_args(argv)
 
 
@@ -228,9 +222,7 @@ def main(argv: Iterable[str] | None = None) -> None:
     if args.eval_every is not None:
         config.setdefault("train", {})["eval_every"] = args.eval_every
     if args.early_stopping_patience is not None:
-        config.setdefault("train", {})[
-            "early_stopping_patience"
-        ] = args.early_stopping_patience
+        config.setdefault("train", {})["early_stopping_patience"] = args.early_stopping_patience
 
     config["offline"] = bool(args.offline)
 

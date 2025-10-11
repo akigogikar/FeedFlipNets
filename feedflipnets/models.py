@@ -21,7 +21,7 @@ def backprop_deltas(
     deltas: List[np.ndarray] = [None] * (last_layer + 1)
     deltas[last_layer] = err
     for layer_idx in reversed(range(last_layer)):
-        deltas[layer_idx] = (
-            weights[layer_idx + 1].T @ deltas[layer_idx + 1]
-        ) * tanh_deriv(weights[layer_idx] @ activs[layer_idx])
+        deltas[layer_idx] = (weights[layer_idx + 1].T @ deltas[layer_idx + 1]) * tanh_deriv(
+            weights[layer_idx] @ activs[layer_idx]
+        )
     return deltas

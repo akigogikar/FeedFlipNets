@@ -34,9 +34,7 @@ def make_dataset(
         return x, y_true + 0.05 * rng.standard_normal(size=y_true.shape)
 
     if dataset == "mnist":
-        spec = registry.get(
-            "mnist", subset="train", max_items=max_points or 1, one_hot=False
-        )
+        spec = registry.get("mnist", subset="train", max_items=max_points or 1, one_hot=False)
         batch = next(spec.loader("train", 1))
         x = batch.inputs[0:1]
         if max_points is not None:
@@ -79,17 +77,13 @@ def tanh_deriv(x: np.ndarray) -> np.ndarray:
 
 
 def quantize_stoch(W: np.ndarray, thr: float) -> np.ndarray:
-    warnings.warn(
-        "Use feedflipnets.core.quant.quantize_ternary_stoch instead", DeprecationWarning
-    )
+    warnings.warn("Use feedflipnets.core.quant.quantize_ternary_stoch instead", DeprecationWarning)
     rng = np.random.default_rng()
     return quantize_ternary_stoch(W, thr, rng)
 
 
 def quantize_fixed(W: np.ndarray, thr: float = 0.0) -> np.ndarray:
-    warnings.warn(
-        "Use feedflipnets.core.quant.quantize_ternary_det instead", DeprecationWarning
-    )
+    warnings.warn("Use feedflipnets.core.quant.quantize_ternary_det instead", DeprecationWarning)
     return quantize_ternary_det(W, thr)
 
 

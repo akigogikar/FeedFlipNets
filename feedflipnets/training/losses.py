@@ -115,9 +115,7 @@ def _bce_with_logits(logits: Array, target: Array) -> tuple[float, Array]:
     target = target.astype(np.float32)
     probs = _sigmoid(logits)
     eps = 1e-9
-    loss = float(
-        -np.mean(target * np.log(probs + eps) + (1 - target) * np.log(1 - probs + eps))
-    )
+    loss = float(-np.mean(target * np.log(probs + eps) + (1 - target) * np.log(1 - probs + eps)))
     grad = probs - target
     return loss, grad
 

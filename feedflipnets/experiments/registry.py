@@ -79,9 +79,7 @@ def _validate(raw: Mapping[str, object], schema: Mapping[str, object]) -> None:
                 raise ValueError(f"Experiment '{name}' missing field '{field}'")
         strategy = merged.get("strategy")
         if allowed_strategies and strategy not in allowed_strategies:
-            raise ValueError(
-                f"Experiment '{name}' has unsupported strategy '{strategy}'"
-            )
+            raise ValueError(f"Experiment '{name}' has unsupported strategy '{strategy}'")
 
 
 def _build_pipeline_config(params: Mapping[str, object]) -> Dict[str, object]:

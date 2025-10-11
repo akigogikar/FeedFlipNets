@@ -33,9 +33,7 @@ def _factory(
     **_: object,
 ) -> DatasetSpec:
     x, y = _make_dataset(freq=freq, n_points=n_points, seed=seed)
-    splits = deterministic_split(
-        x.shape[0], val_split=val_split, test_split=test_split, seed=seed
-    )
+    splits = deterministic_split(x.shape[0], val_split=val_split, test_split=test_split, seed=seed)
 
     def loader(split: str, batch_size: int) -> Iterator[Batch]:
         if split not in {"train", "val", "test"}:

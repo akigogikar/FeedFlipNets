@@ -35,9 +35,7 @@ class CacheManifest:
     """Track cached artefacts and provenance information."""
 
     cache_dir: Path = field(default_factory=lambda: DEFAULT_CACHE_DIR)
-    data: MutableMapping[str, Mapping[str, object]] = field(
-        init=False, default_factory=dict
-    )
+    data: MutableMapping[str, Mapping[str, object]] = field(init=False, default_factory=dict)
 
     def __post_init__(self) -> None:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -52,9 +50,7 @@ class CacheManifest:
 
     def record(self, name: str, metadata: Mapping[str, object]) -> None:
         snapshot = dict(metadata)
-        snapshot.setdefault(
-            "recorded_at", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        )
+        snapshot.setdefault("recorded_at", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
         self.data[name] = snapshot
         self._path.write_text(json.dumps(self.data, indent=2, sort_keys=True))
 
@@ -87,9 +83,7 @@ def fetch(
 
     if offline_mode:
         if offline_path is None:
-            raise CacheError(
-                f"Offline mode requested for {name!r} but no offline_path provided"
-            )
+            raise CacheError(f"Offline mode requested for {name!r} but no offline_path provided")
         path = _ensure_offline(offline_path, offline_builder)
         record = _make_record(name, url, path, checksum, mode="offline")
         manifest.record(name, record)

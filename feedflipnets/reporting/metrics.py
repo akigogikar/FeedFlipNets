@@ -11,9 +11,7 @@ from typing import Mapping
 
 def _git_sha() -> str:
     try:
-        out = subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL
-        )
+        out = subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL)
         return out.decode().strip()
     except Exception:  # pragma: no cover - git may be unavailable in tests
         return "unknown"
@@ -44,9 +42,7 @@ class JsonlSink:
             "seed": self.seed,
             "sha": self.sha,
         }
-        record.update(
-            {k: float(v) for k, v in metrics.items() if isinstance(v, (int, float))}
-        )
+        record.update({k: float(v) for k, v in metrics.items() if isinstance(v, (int, float))})
         with self.path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(record) + "\n")
 
@@ -69,9 +65,7 @@ class CsvSink:
 
     def _write(self, epoch: int, metrics: Mapping[str, float]) -> None:
         row = {"epoch": int(epoch), "split": self.split}
-        row.update(
-            {k: float(v) for k, v in metrics.items() if isinstance(v, (int, float))}
-        )
+        row.update({k: float(v) for k, v in metrics.items() if isinstance(v, (int, float))})
         with self.path.open("a", encoding="utf-8", newline="") as handle:
             fieldnames = sorted(row.keys())
             writer = csv.DictWriter(handle, fieldnames=fieldnames)

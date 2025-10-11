@@ -43,12 +43,8 @@ def _parse_ts(content: str) -> tuple[np.ndarray, np.ndarray]:
 
 def _load_from_zip(path: Path, dataset: str) -> tuple[np.ndarray, np.ndarray]:
     with zipfile.ZipFile(path, "r") as archive:
-        train_name = next(
-            n for n in archive.namelist() if n.lower().endswith("_train.ts")
-        )
-        test_name = next(
-            n for n in archive.namelist() if n.lower().endswith("_test.ts")
-        )
+        train_name = next(n for n in archive.namelist() if n.lower().endswith("_train.ts"))
+        test_name = next(n for n in archive.namelist() if n.lower().endswith("_test.ts"))
         train_bytes = archive.read(train_name).decode("utf-8", errors="ignore")
         test_bytes = archive.read(test_name).decode("utf-8", errors="ignore")
     X_train, y_train = _parse_ts(train_bytes)
@@ -156,9 +152,7 @@ def build_ucr_dataset(
             raise ValueError(f"Unknown split: {split}")
         indices = getattr(splits, split)
         split_seed = seed + {"train": 0, "val": 1, "test": 2}[split]
-        return batch_iterator(
-            features, targets, indices, batch_size=batch_size, seed=split_seed
-        )
+        return batch_iterator(features, targets, indices, batch_size=batch_size, seed=split_seed)
 
     data_spec = DataSpec(
         d_in=int(features.shape[1]),

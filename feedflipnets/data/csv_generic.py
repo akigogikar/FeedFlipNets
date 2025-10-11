@@ -62,9 +62,7 @@ def load_csv_regression(
             "std": t_std.flatten().tolist(),
         }
 
-    splits = deterministic_split(
-        X.shape[0], val_split=val_split, test_split=test_split, seed=seed
-    )
+    splits = deterministic_split(X.shape[0], val_split=val_split, test_split=test_split, seed=seed)
 
     def loader(split: str, batch_size: int) -> Iterator[Batch]:
         if split not in {"train", "val", "test"}:
@@ -113,9 +111,7 @@ def load_csv_classification(
 ) -> DatasetSpec:
     """Load a classification dataset from a CSV file."""
 
-    path = (
-        Path(csv_path) if csv_path else _default_path("csv_classification_fixture.csv")
-    )
+    path = Path(csv_path) if csv_path else _default_path("csv_classification_fixture.csv")
     X, y_raw = _load_csv(path, target_col)
     X = X.astype(np.float32)
     encoder = LabelEncoder()
@@ -126,9 +122,7 @@ def load_csv_classification(
     else:
         y = y_encoded.astype(np.float32).reshape(-1, 1)
 
-    splits = deterministic_split(
-        X.shape[0], val_split=val_split, test_split=test_split, seed=seed
-    )
+    splits = deterministic_split(X.shape[0], val_split=val_split, test_split=test_split, seed=seed)
 
     def loader(split: str, batch_size: int) -> Iterator[Batch]:
         if split not in {"train", "val", "test"}:

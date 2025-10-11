@@ -44,7 +44,5 @@ def test_registry_baseline_runtime(tmp_path, monkeypatch):
     assert metrics.exists()
     assert summary.exists()
 
-    metrics_data = [
-        json.loads(line) for line in metrics.read_text().splitlines() if line
-    ]
+    metrics_data = [json.loads(line) for line in metrics.read_text().splitlines() if line]
     assert metrics_data, "metrics should not be empty"

@@ -26,9 +26,7 @@ def compute_auc(points: Sequence[float]) -> float:
     return _area(y, x)
 
 
-def _extract_numeric(
-    records: Iterable[Mapping[str, object]]
-) -> Mapping[str, list[float]]:
+def _extract_numeric(records: Iterable[Mapping[str, object]]) -> Mapping[str, list[float]]:
     metrics: dict[str, list[float]] = {}
     for record in records:
         for key, value in record.items():

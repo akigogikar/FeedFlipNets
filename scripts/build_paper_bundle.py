@@ -61,9 +61,7 @@ def _write_methods_stub(
         if isinstance(dataset, dict)
         else "unknown"
     )
-    strategy = (
-        model.get("strategy", "unknown") if isinstance(model, dict) else "unknown"
-    )
+    strategy = model.get("strategy", "unknown") if isinstance(model, dict) else "unknown"
     seed = train.get("seed", "unknown") if isinstance(train, dict) else "unknown"
 
     lines = [
@@ -108,9 +106,7 @@ def _create_zip(out_dir: Path) -> Path:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--run-dir", type=Path, required=True, help="Run directory to bundle"
-    )
+    parser.add_argument("--run-dir", type=Path, required=True, help="Run directory to bundle")
     parser.add_argument(
         "--out",
         "--out-dir",
@@ -119,9 +115,7 @@ def main(argv: list[str] | None = None) -> None:
         default=Path("paper_bundle"),
         help="Output directory for the bundle",
     )
-    parser.add_argument(
-        "--include-plots", action="store_true", help="Generate headless plots"
-    )
+    parser.add_argument("--include-plots", action="store_true", help="Generate headless plots")
     args = parser.parse_args(argv)
 
     run_dir = args.run_dir

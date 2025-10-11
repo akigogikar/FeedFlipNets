@@ -19,9 +19,7 @@ def _offline_dataset() -> tuple[np.ndarray, np.ndarray]:
     rng = np.random.default_rng(2718)
     n_samples = 256
     n_features = 8
-    features = rng.normal(loc=0.0, scale=1.0, size=(n_samples, n_features)).astype(
-        np.float32
-    )
+    features = rng.normal(loc=0.0, scale=1.0, size=(n_samples, n_features)).astype(np.float32)
     weights = rng.normal(loc=0.0, scale=1.0, size=(n_features, 1)).astype(np.float32)
     noise = rng.normal(loc=0.0, scale=0.1, size=(n_samples, 1)).astype(np.float32)
     targets = features @ weights + noise
@@ -52,9 +50,7 @@ def build_california_dataset(
         y = dataset.target.astype(np.float32).reshape(-1, 1)
         provenance = {
             "mode": "download",
-            "sklearn_version": getattr(
-                fetch_california_housing, "__module__", "sklearn"
-            ),
+            "sklearn_version": getattr(fetch_california_housing, "__module__", "sklearn"),
         }
 
     normalization: dict[str, dict[str, list[float]]] = {}
@@ -73,9 +69,7 @@ def build_california_dataset(
             "std": t_std.flatten().tolist(),
         }
 
-    splits = deterministic_split(
-        X.shape[0], val_split=val_split, test_split=test_split, seed=seed
-    )
+    splits = deterministic_split(X.shape[0], val_split=val_split, test_split=test_split, seed=seed)
 
     def loader(split: str, batch_size: int) -> Iterator[Batch]:
         if split not in {"train", "val", "test"}:

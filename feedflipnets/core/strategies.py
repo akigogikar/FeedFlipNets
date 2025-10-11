@@ -74,8 +74,7 @@ class DFA:
         for hidden_dim in dims[1:-1]:
             scale = 1.0 / np.sqrt(output_dim)
             matrices.append(
-                self.rng.standard_normal((output_dim, hidden_dim)).astype(np.float32)
-                * scale
+                self.rng.standard_normal((output_dim, hidden_dim)).astype(np.float32) * scale
             )
         return _SimpleState(feedback=matrices)
 
@@ -116,10 +115,7 @@ class TernaryDFA:
         matrices: List[Array] = []
         for hidden_dim in dims[1:-1]:
             scale = 1.0 / np.sqrt(output_dim)
-            matrix = (
-                self.rng.standard_normal((output_dim, hidden_dim)).astype(np.float32)
-                * scale
-            )
+            matrix = self.rng.standard_normal((output_dim, hidden_dim)).astype(np.float32) * scale
             matrices.append(quantize_ternary_det(matrix, self.threshold))
         return _SimpleState(feedback=matrices)
 

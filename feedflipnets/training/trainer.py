@@ -181,9 +181,7 @@ class Trainer:
         train_steps = steps_per_epoch or self._infer_steps(train_loader)
         ternary_mode = ternary_mode or "per_step"
         if ternary_mode not in {"off", "per_step", "per_epoch"}:
-            raise ValueError(
-                "ternary_mode must be one of {'off','per_step','per_epoch'}"
-            )
+            raise ValueError("ternary_mode must be one of {'off','per_step','per_epoch'}")
 
         best_loss = float("inf")
         best_state: Mapping[str, Array] | None = None
@@ -250,10 +248,7 @@ class Trainer:
                 self._save_checkpoint(checkpoint_dir / "best.ckpt", best_state)
             else:
                 epochs_no_improve += 1
-                if (
-                    early_stopping_patience
-                    and epochs_no_improve >= early_stopping_patience
-                ):
+                if early_stopping_patience and epochs_no_improve >= early_stopping_patience:
                     break
 
         last_state = self.model.state_dict()
@@ -299,9 +294,7 @@ class Trainer:
             preds_all.append(predictions.copy())
             targets_all.append(batch.targets.copy())
             if training:
-                grads, current_state = self.strategy.backward(
-                    activations, delta, current_state
-                )
+                grads, current_state = self.strategy.backward(activations, delta, current_state)
                 self.optimizer.step(self.model, grads)
                 if ternary_mode == "per_step":
                     self.model.quantise()

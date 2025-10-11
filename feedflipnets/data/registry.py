@@ -93,9 +93,7 @@ def register_dataset(
     if factory is not None:
         return _decorator(factory)
     if name is None:
-        raise TypeError(
-            "register_dataset requires a name when used without a decorator"
-        )
+        raise TypeError("register_dataset requires a name when used without a decorator")
     return _decorator
 
 

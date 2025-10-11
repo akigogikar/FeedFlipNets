@@ -35,9 +35,7 @@ def _factory(
     inputs, targets = _make_dataset(
         length=length, seed=seed, freq=freq, amplitude=amplitude, noise=noise
     )
-    splits = deterministic_split(
-        inputs.shape[0], val_split=0.1, test_split=0.2, seed=seed
-    )
+    splits = deterministic_split(inputs.shape[0], val_split=0.1, test_split=0.2, seed=seed)
     provenance = {
         "type": "synth_fixture",
         "length": length,
@@ -53,9 +51,7 @@ def _factory(
             raise ValueError(f"Unsupported split: {split}")
         indices = getattr(splits, split)
         split_seed = seed + {"train": 0, "val": 1, "test": 2}[split]
-        return batch_iterator(
-            inputs, targets, indices, batch_size=batch_size, seed=split_seed
-        )
+        return batch_iterator(inputs, targets, indices, batch_size=batch_size, seed=split_seed)
 
     data_spec = DataSpec(
         d_in=int(inputs.shape[1]),
