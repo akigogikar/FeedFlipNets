@@ -68,7 +68,7 @@ def test_regression_training_improves_r2(tmp_path) -> None:
         loss="auto",
         metric_names=["r2", "mae"],
         split_loggers={"train": [capture]},
-        ternary_mode="off",
+        flip="off",
         checkpoint_dir=tmp_path,
     )
 
@@ -111,7 +111,7 @@ def test_multiclass_accuracy_with_auto_loss() -> None:
         loss="auto",
         metric_names="default",
         split_loggers={"train": [capture]},
-        ternary_mode="off",
+        flip="off",
     )
 
     last = capture.history[-1][1]
@@ -119,8 +119,8 @@ def test_multiclass_accuracy_with_auto_loss() -> None:
     assert np.isfinite(last["loss"])
 
 
-@pytest.mark.parametrize("ternary_mode", ["off", "per_step", "per_epoch"])
-def test_binary_metrics_and_checkpoints(tmp_path, ternary_mode: str) -> None:
+@pytest.mark.parametrize("flip_schedule", ["off", "per_step", "per_epoch"])
+def test_binary_metrics_and_checkpoints(tmp_path, flip_schedule: str) -> None:
     rng = np.random.default_rng(2)
     n = 120
     X = rng.standard_normal((n, 2), dtype=np.float32)
@@ -136,8 +136,9 @@ def test_binary_metrics_and_checkpoints(tmp_path, ternary_mode: str) -> None:
     trainer = Trainer(model=model, strategy=Backprop(), optimizer=optimizer)
     capture = _Capture()
 
-    ckpt_dir = tmp_path / ternary_mode
+    ckpt_dir = tmp_path / flip_schedule
     ckpt_dir.mkdir()
+    run_kwargs = {"flip": "off"} if flip_schedule == "off" else {"flip": "ternary", "flip_schedule": flip_schedule}
     trainer.run(
         loader,
         epochs=25,
@@ -148,7 +149,7 @@ def test_binary_metrics_and_checkpoints(tmp_path, ternary_mode: str) -> None:
         loss="auto",
         metric_names="default",
         split_loggers={"train": [capture]},
-        ternary_mode=ternary_mode,
+        **run_kwargs,
         checkpoint_dir=ckpt_dir,
     )
 

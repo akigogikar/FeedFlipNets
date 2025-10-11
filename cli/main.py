@@ -51,7 +51,7 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--enable-plots", action="store_true", help="Enable plotting adapters")
     parser.add_argument(
         "--feedback",
-        choices=["auto", "flip", "dfa", "structured", "backprop", "ternary_dfa"],
+        choices=["auto", "dfa", "structured", "backprop", "ternary_dfa"],
         help="Override the feedback/learning strategy",
     )
     parser.add_argument(
@@ -65,14 +65,19 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
         help="Comma separated list of metrics to compute (or 'default')",
     )
     parser.add_argument(
-        "--ternary",
-        choices=["off", "per_step", "per_epoch"],
-        help="Ternary quantisation schedule",
+        "--flip",
+        choices=["off", "ternary"],
+        help="Forward-path flip mode (off or ternary)",
     )
     parser.add_argument(
-        "--ternary-threshold",
+        "--flip-schedule",
+        choices=["per_step", "per_epoch"],
+        help="How often to refresh the quantised forward weights",
+    )
+    parser.add_argument(
+        "--flip-threshold",
         type=float,
-        help="Threshold used for ternary quantisation",
+        help="Threshold used for ternary flips",
     )
     parser.add_argument(
         "--eval-every",
@@ -215,10 +220,12 @@ def main(argv: Iterable[str] | None = None) -> None:
         config.setdefault("train", {})["loss"] = args.loss
     if args.metrics and args.metrics != "default":
         config.setdefault("train", {})["metrics"] = args.metrics
-    if args.ternary:
-        config.setdefault("train", {})["ternary"] = args.ternary
-    if args.ternary_threshold is not None:
-        config.setdefault("train", {})["ternary_threshold"] = args.ternary_threshold
+    if args.flip:
+        config.setdefault("train", {})["flip"] = args.flip.lower()
+    if args.flip_schedule:
+        config.setdefault("train", {})["flip_schedule"] = args.flip_schedule.lower()
+    if args.flip_threshold is not None:
+        config.setdefault("train", {})["flip_threshold"] = args.flip_threshold
     if args.eval_every is not None:
         config.setdefault("train", {})["eval_every"] = args.eval_every
     if args.early_stopping_patience is not None:

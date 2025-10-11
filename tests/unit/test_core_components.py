@@ -1,6 +1,6 @@
 import numpy as np
 
-from feedflipnets.core.strategies import DFA, FlipTernary, StructuredFeedback
+from feedflipnets.core.strategies import DFA, StructuredFeedback, TernaryDFA
 from feedflipnets.core.types import ModelDescription
 from feedflipnets.data.cache import CacheManifest, fetch
 from feedflipnets.reporting.plots import PlotAdapter
@@ -25,10 +25,10 @@ def test_dfa_gradient_shapes():
     assert grads["W1"].shape == (dims[1], dims[2])
 
 
-def test_flip_strategy_uses_forward_weights():
+def test_ternary_dfa_uses_quantised_feedback():
     dims = [2, 4, 1]
     activations, error = _make_activations(dims)
-    strategy = FlipTernary()
+    strategy = TernaryDFA(np.random.default_rng(0), threshold=0.05)
     state = strategy.init(ModelDescription(layer_dims=dims))
     grads, _ = strategy.backward(activations, error, state)
     assert set(grads) == {"W0", "W1"}

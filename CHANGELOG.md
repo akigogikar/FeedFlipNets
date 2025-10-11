@@ -7,7 +7,7 @@
 ### Added
 - Offline-first presets for MNIST, UCR GunPoint, California Housing, and
   20 Newsgroups under `configs/presets/`, plus a configurable sweep helper in
-  `scripts/preset_sweep.py` for grid-searching feedback, ternary schedules,
+  `scripts/preset_sweep.py` for grid-searching feedback, flip modes and schedules,
   learning rates, and hidden sizes.
 - GitHub Actions workflow covering Python 3.10/3.11 linting, formatting, tests,
   and preset smoke runs that upload metrics artifacts.

@@ -144,38 +144,6 @@ class TernaryDFA:
 
 
 @dataclass
-class FlipTernary:
-    """Use sign-flipped forward weights for the feedback signal."""
-
-    refresh: str = "per_step"
-
-    def init(self, model: ModelDescription) -> StrategyState:  # noqa: D401
-        return StrategyState(metadata={"refresh": self.refresh})
-
-    def backward(
-        self,
-        activations: ActivationState,
-        error: Array,
-        state: StrategyState,
-    ) -> tuple[Gradients, StrategyState]:
-        weights = activations.weights
-        layer_inputs = activations.layer_inputs
-        layer_derivs = activations.layer_derivs
-
-        grads: Gradients = {}
-        batch = error.shape[0]
-        delta = error
-        last_idx = len(weights) - 1
-        grads[f"W{last_idx}"] = layer_inputs[last_idx].T @ delta / batch
-        for idx in reversed(range(last_idx)):
-            forward = weights[idx + 1]
-            feedback = -np.sign(forward).T
-            delta = (delta @ feedback) * layer_derivs[idx]
-            grads[f"W{idx}"] = layer_inputs[idx].T @ delta / batch
-        return grads, state
-
-
-@dataclass
 class StructuredFeedback:
     """Feedback alignment using structured random matrices."""
 
@@ -323,16 +291,10 @@ def _blockdiag_orthogonal(
     return B
 
 
-# Backwards compatibility aliases -------------------------------------------------
-
-FlipFeedback = FlipTernary
-
 __all__ = [
     "FeedbackStrategy",
     "Backprop",
     "DFA",
     "TernaryDFA",
-    "FlipTernary",
-    "FlipFeedback",
     "StructuredFeedback",
 ]

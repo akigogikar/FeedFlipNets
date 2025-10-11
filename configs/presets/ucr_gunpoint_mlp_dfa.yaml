@@ -17,5 +17,6 @@ train:
   eval_every: 1
   lr: 0.02
   optimizer: sgd
-  ternary: per_step
+  flip: ternary
+  flip_schedule: per_step
   run_dir: runs/ucr-gunpoint-mlp-dfa
