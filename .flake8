@@ -1,0 +1,4 @@
+[flake8]
+max-line-length = 100
+# These align flake8 with Black’s formatting rules, should you adopt Black
+extend-ignore = E203, W503
