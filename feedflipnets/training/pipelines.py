@@ -233,6 +233,9 @@ def _train_single(config: Mapping[str, object]) -> RunResult:
         cache_dir=cache_dir,
         **data_cfg.get("options", {}),
     )
+    data_spec = dataset.data_spec
+    model_cfg.setdefault("d_in", int(data_spec.d_in))
+    model_cfg.setdefault("d_out", int(data_spec.d_out))
     batch_size = int(train_cfg.get("batch_size", 1))
     data_iter = _IterableLoader(lambda: dataset.loader("train", batch_size))
 
