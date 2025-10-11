@@ -41,13 +41,13 @@ def _dataset_options(
             opts["n_points"] = max_points
         return {"name": "synthetic", "options": opts}
     if dataset == "mnist":
-        options = {"subset": "train", "max_items": max_points or 32, "one_hot": False}
+        options = {"subset": "train", "max_items": max_points or 32, "one_hot": True}
         return {"name": "mnist", "options": options}
     if dataset == "tinystories":
         return {"name": "tinystories", "options": {}}
     if dataset and dataset.startswith("ucr:"):
         name = dataset.split(":", 1)[1]
-        return {"name": "ucr_uea", "options": {"name": name}}
+        return {"name": "ucr", "options": {"ucr_name": name}}
     raise ValueError(f"Unsupported dataset: {dataset}")
 
 

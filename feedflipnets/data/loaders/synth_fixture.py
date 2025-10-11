@@ -1,40 +1,24 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Iterator
 
 import numpy as np
 
 from ...core.types import Batch
-from ..registry import DatasetSpec, register_dataset
-
-
-@dataclass
-class _FixtureDataset:
-    inputs: np.ndarray
-    targets: np.ndarray
-
-    def batches(self, batch_size: int) -> Iterator[Batch]:
-        n = self.inputs.shape[0]
-        if n == 0:
-            raise ValueError("Fixture dataset cannot be empty")
-        offset = 0
-        while True:
-            idx = (np.arange(batch_size) + offset) % n
-            offset = (offset + batch_size) % n
-            yield Batch(inputs=self.inputs[idx], targets=self.targets[idx])
+from ..registry import DataSpec, DatasetSpec, register_dataset
+from ..utils import batch_iterator, deterministic_split
 
 
 def _make_dataset(
     length: int, seed: int, freq: int, amplitude: float, noise: float
-) -> _FixtureDataset:
+) -> tuple[np.ndarray, np.ndarray]:
     rng = np.random.default_rng(seed)
     x = np.linspace(-1.0, 1.0, length, dtype=np.float32).reshape(-1, 1)
     y_true = amplitude * np.sin(freq * np.pi * x)
     if noise > 0:
         y_true = y_true + noise * rng.standard_normal(size=y_true.shape)
     y = y_true.astype(np.float32)
-    return _FixtureDataset(inputs=x.astype(np.float32), targets=y)
+    return x.astype(np.float32), y
 
 
 def _factory(
@@ -48,8 +32,11 @@ def _factory(
     cache_dir: str | None = None,
     **_: object,
 ) -> DatasetSpec:
-    dataset = _make_dataset(
+    inputs, targets = _make_dataset(
         length=length, seed=seed, freq=freq, amplitude=amplitude, noise=noise
+    )
+    splits = deterministic_split(
+        inputs.shape[0], val_split=0.1, test_split=0.2, seed=seed
     )
     provenance = {
         "type": "synth_fixture",
@@ -62,11 +49,28 @@ def _factory(
     }
 
     def loader(split: str, batch_size: int) -> Iterator[Batch]:
-        if split not in {"train", "test", "eval"}:
+        if split not in {"train", "val", "test"}:
             raise ValueError(f"Unsupported split: {split}")
-        return dataset.batches(batch_size)
+        indices = getattr(splits, split)
+        split_seed = seed + {"train": 0, "val": 1, "test": 2}[split]
+        return batch_iterator(
+            inputs, targets, indices, batch_size=batch_size, seed=split_seed
+        )
 
-    return DatasetSpec(name="synth_fixture", provenance=provenance, loader=loader)
+    data_spec = DataSpec(
+        d_in=int(inputs.shape[1]),
+        d_out=int(targets.shape[1]),
+        task_type="regression",
+        normalization={},
+    )
+
+    return DatasetSpec(
+        name="synth_fixture",
+        loader=loader,
+        data_spec=data_spec,
+        provenance=provenance,
+        splits={k: int(v) for k, v in splits.sizes.items()},
+    )
 
 
 register_dataset("synth_fixture", _factory)

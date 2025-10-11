@@ -60,6 +60,56 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
         help="Force offline dataset usage",
     )
     parser.add_argument(
+        "--dataset",
+        choices=[
+            "mnist",
+            "ucr",
+            "california_housing",
+            "20newsgroups",
+            "csv_regression",
+            "csv_classification",
+        ],
+        help="Override the dataset used by the run",
+    )
+    parser.add_argument("--ucr-name", default="GunPoint", help="UCR dataset name")
+    parser.add_argument("--csv-path", help="Path to a CSV file for csv_* datasets")
+    parser.add_argument(
+        "--target-col",
+        help="Target column name for CSV datasets (defaults depend on loader)",
+    )
+    parser.add_argument(
+        "--text-subset",
+        default="all",
+        help="Subset for 20 Newsgroups (train/test/all)",
+    )
+    parser.add_argument(
+        "--hash-dim",
+        type=int,
+        default=4096,
+        help="Hashing vectorizer dimensionality for 20 Newsgroups",
+    )
+    parser.add_argument(
+        "--val-split",
+        type=float,
+        help="Validation split ratio for datasets supporting it",
+    )
+    parser.add_argument(
+        "--test-split",
+        type=float,
+        help="Test split ratio for datasets supporting it",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        help="Seed used for dataset splits and training",
+    )
+    parser.add_argument(
+        "--one-hot",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Force one-hot targets for classification datasets",
+    )
+    parser.add_argument(
         "--list-presets", action="store_true", help="List available presets and exit"
     )
     parser.add_argument(
@@ -131,6 +181,34 @@ def main(argv: Iterable[str] | None = None) -> None:
         config.setdefault("train", {})["enable_plots"] = True
 
     config["offline"] = bool(args.offline)
+
+    if args.dataset:
+        data_cfg = {"name": args.dataset, "options": {}}
+        opts = data_cfg["options"]
+        if args.val_split is not None:
+            opts["val_split"] = float(args.val_split)
+        if args.test_split is not None:
+            opts["test_split"] = float(args.test_split)
+        if args.seed is not None:
+            opts["seed"] = int(args.seed)
+        if args.dataset == "mnist" and args.one_hot is not None:
+            opts["one_hot"] = bool(args.one_hot)
+        if args.dataset == "ucr":
+            opts["ucr_name"] = args.ucr_name
+        if args.dataset == "20newsgroups":
+            opts["subset"] = args.text_subset
+            opts["n_features"] = int(args.hash_dim)
+        if args.dataset in {"csv_regression", "csv_classification"}:
+            if args.csv_path:
+                opts["csv_path"] = args.csv_path
+            if args.target_col:
+                opts["target_col"] = args.target_col
+            if args.dataset == "csv_classification" and args.one_hot is not None:
+                opts["one_hot"] = bool(args.one_hot)
+        config["data"] = data_cfg
+
+    if args.seed is not None:
+        config.setdefault("train", {})["seed"] = int(args.seed)
 
     os.environ["FEEDFLIP_DATA_OFFLINE"] = "1" if args.offline else "0"
 
