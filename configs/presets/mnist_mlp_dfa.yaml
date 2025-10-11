@@ -1,0 +1,21 @@
+offline: true
+data:
+  name: mnist
+  options:
+    seed: 7
+    val_split: 0.1
+    test_split: 0.2
+    one_hot: true
+model:
+  hidden: [256, 256]
+  quant: det
+  strategy: dfa
+train:
+  seed: 7
+  batch_size: 64
+  epochs: 5
+  eval_every: 1
+  lr: 0.05
+  optimizer: sgd
+  ternary: per_step
+  run_dir: runs/mnist-mlp-dfa

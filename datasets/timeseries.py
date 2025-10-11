@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import os
 import zipfile
-import numpy as np
 from typing import Tuple
+
+import numpy as np
 
 from .utils import download_file, normalize
 

@@ -10,23 +10,45 @@ from sklearn.datasets import fetch_20newsgroups
 from sklearn.feature_extraction.text import HashingVectorizer
 
 from ..core.types import Batch
-from .registry import DataSpec, DatasetSpec, register_dataset
+from .registry import DatasetSpec, DataSpec, register_dataset
 from .utils import batch_iterator, deterministic_split, resolve_cache_dir
 
 
 def _offline_dataset(n_features: int) -> tuple[np.ndarray, np.ndarray]:
-    """Return a deterministic synthetic text dataset."""
+    """Return a deterministic sparse bag-of-words style dataset."""
 
     rng = np.random.default_rng(4242)
-    n_samples = 240
     num_classes = 8
-    X = np.zeros((n_samples, n_features), dtype=np.float32)
-    for i in range(n_samples):
-        k = int(min(max(8, n_features // 64), n_features))
-        indices = rng.choice(n_features, size=max(1, k), replace=False)
-        values = rng.random(size=indices.size, dtype=np.float32)
-        X[i, indices] = values
-    y = rng.integers(0, num_classes, size=n_samples, dtype=np.int64)
+    samples_per_class = 30
+    tokens_per_doc = max(6, n_features // 48)
+
+    anchors: list[np.ndarray] = []
+    for cls in range(num_classes):
+        anchor = np.zeros(n_features, dtype=np.float32)
+        active = rng.choice(
+            n_features, size=min(tokens_per_doc * 2, n_features), replace=False
+        )
+        anchor[active] = rng.uniform(0.6, 1.0, size=active.size).astype(np.float32)
+        anchors.append(anchor)
+
+    documents: list[np.ndarray] = []
+    labels: list[int] = []
+    for cls, anchor in enumerate(anchors):
+        for _ in range(samples_per_class):
+            doc = anchor.copy()
+            mask = rng.random(size=n_features) < 0.15
+            doc *= mask.astype(np.float32)
+            noise_idx = rng.choice(
+                n_features, size=min(tokens_per_doc // 2 + 1, n_features), replace=False
+            )
+            doc[noise_idx] += rng.uniform(0.0, 0.3, size=noise_idx.size).astype(
+                np.float32
+            )
+            documents.append(doc)
+            labels.append(cls)
+
+    X = np.stack(documents, axis=0)
+    y = np.asarray(labels, dtype=np.int64)
     return X, y
 
 
@@ -48,7 +70,9 @@ def build_20newsgroups(
         provenance: dict[str, object] = {"mode": "offline", "source": "synthetic"}
     else:
         cache_root = resolve_cache_dir(cache_dir)
-        raw = fetch_20newsgroups(subset=subset, remove=("headers", "footers"), data_home=str(cache_root))
+        raw = fetch_20newsgroups(
+            subset=subset, remove=("headers", "footers"), data_home=str(cache_root)
+        )
         vectorizer = HashingVectorizer(
             n_features=n_features,
             alternate_sign=False,
@@ -65,7 +89,9 @@ def build_20newsgroups(
         }
 
     num_classes = int(np.max(y)) + 1 if y.size else 0
-    y_one_hot = np.eye(num_classes, dtype=np.float32)[y] if num_classes else y.reshape(-1, 1)
+    y_one_hot = (
+        np.eye(num_classes, dtype=np.float32)[y] if num_classes else y.reshape(-1, 1)
+    )
 
     splits = deterministic_split(
         X.shape[0], val_split=val_split, test_split=test_split, seed=seed
@@ -76,7 +102,9 @@ def build_20newsgroups(
             raise ValueError(f"Unknown split: {split}")
         indices = getattr(splits, split)
         split_seed = seed + {"train": 0, "val": 1, "test": 2}[split]
-        return batch_iterator(X, y_one_hot, indices, batch_size=batch_size, seed=split_seed)
+        return batch_iterator(
+            X, y_one_hot, indices, batch_size=batch_size, seed=split_seed
+        )
 
     data_spec = DataSpec(
         d_in=int(X.shape[1]),

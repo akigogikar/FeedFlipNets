@@ -11,13 +11,7 @@ from typing import Callable, Dict, Iterable, List, Mapping, Sequence
 
 import numpy as np
 
-from ..core.strategies import (
-    Backprop,
-    DFA,
-    FlipTernary,
-    StructuredFeedback,
-    TernaryDFA,
-)
+from ..core.strategies import DFA, Backprop, FlipTernary, StructuredFeedback, TernaryDFA
 from ..core.types import Batch, RunResult
 from ..data import registry
 from ..reporting.artifacts import write_manifest
@@ -188,12 +182,66 @@ _PRESETS: Dict[str, Mapping[str, object]] = {
     },
 }
 
+_PRESET_DIR = Path(__file__).resolve().parents[2] / "configs" / "presets"
+_FILE_PRESETS_CACHE: Dict[str, Mapping[str, object]] | None = None
+
+
+def _read_preset_file(path: Path) -> Mapping[str, object]:
+    text = path.read_text()
+    suffix = path.suffix.lower()
+    if suffix in {".yaml", ".yml"}:
+        try:
+            import yaml  # type: ignore
+        except Exception as exc:  # pragma: no cover - optional dependency
+            raise RuntimeError(
+                "PyYAML is required to load preset files in YAML format"
+            ) from exc
+        data = yaml.safe_load(text) or {}
+    elif suffix == ".json":
+        data = json.loads(text or "{}")
+    else:
+        raise ValueError(f"Unsupported preset file type: {path.suffix}")
+
+    if not isinstance(data, Mapping):
+        raise TypeError(f"Preset {path.name} must decode to a mapping")
+    return data
+
+
+def _file_presets() -> Dict[str, Mapping[str, object]]:
+    global _FILE_PRESETS_CACHE
+    if _FILE_PRESETS_CACHE is None:
+        presets: Dict[str, Mapping[str, object]] = {}
+        if _PRESET_DIR.exists():
+            for file in sorted(_PRESET_DIR.iterdir()):
+                if file.suffix.lower() not in {".yaml", ".yml", ".json"}:
+                    continue
+                data = _read_preset_file(file)
+                required = {"data", "model", "train"}
+                missing = required - set(data)
+                if missing:
+                    missing_str = ", ".join(sorted(missing))
+                    message = (
+                        f"Preset {file.name} is missing required sections: "
+                        f"{missing_str}"
+                    )
+                    raise KeyError(message)
+                presets[file.stem] = json.loads(json.dumps(data))
+        _FILE_PRESETS_CACHE = presets
+    cache = _FILE_PRESETS_CACHE or {}
+    return {name: deepcopy(cfg) for name, cfg in cache.items()}
+
 
 def presets() -> Mapping[str, Mapping[str, object]]:
-    return deepcopy(_PRESETS)
+    combined: Dict[str, Mapping[str, object]] = {}
+    combined.update({name: deepcopy(cfg) for name, cfg in _PRESETS.items()})
+    combined.update(_file_presets())
+    return combined
 
 
 def load_preset(name: str) -> Mapping[str, object]:
+    file_overrides = _file_presets()
+    if name in file_overrides:
+        return file_overrides[name]
     try:
         return deepcopy(_PRESETS[name])
     except KeyError as exc:  # pragma: no cover - defensive
@@ -209,7 +257,14 @@ def run_pipeline(config: Mapping[str, object]) -> RunResult | List[RunResult]:
 class _SplitLoader:
     """Re-iterable loader with deterministic reseeding per epoch."""
 
-    def __init__(self, spec: registry.DatasetSpec, split: str, batch_size: int, seed: int, steps: int) -> None:
+    def __init__(
+        self,
+        spec: registry.DatasetSpec,
+        split: str,
+        batch_size: int,
+        seed: int,
+        steps: int,
+    ) -> None:
         self.spec = spec
         self.split = split
         self.batch_size = batch_size
@@ -220,7 +275,9 @@ class _SplitLoader:
     def __iter__(self) -> Iterable[Batch]:
         rng_seed = self.seed + self._epoch
         self._epoch += 1
-        return registry.iter_batches(self.spec, self.split, self.batch_size, seed=rng_seed)
+        return registry.iter_batches(
+            self.spec, self.split, self.batch_size, seed=rng_seed
+        )
 
     def __len__(self) -> int:
         return max(1, self.steps)
@@ -295,7 +352,9 @@ def _train_single(config: Mapping[str, object]) -> RunResult:
         fallback = max(1, int(train_size * 0.1)) if train_size else batch_size
         split_sizes["test"] = fallback
 
-    steps_per_epoch, val_steps, test_steps = _resolve_steps(split_sizes, batch_size, train_cfg)
+    steps_per_epoch, val_steps, test_steps = _resolve_steps(
+        split_sizes, batch_size, train_cfg
+    )
 
     train_loader = _SplitLoader(dataset, "train", batch_size, seed, steps_per_epoch)
     val_loader = None
@@ -307,7 +366,9 @@ def _train_single(config: Mapping[str, object]) -> RunResult:
 
     sample_batch = next(iter(dataset.loader("train", 1)))
     inferred_in = sample_batch.inputs.reshape(sample_batch.inputs.shape[0], -1).shape[1]
-    inferred_out = sample_batch.targets.reshape(sample_batch.targets.shape[0], -1).shape[1]
+    inferred_out = sample_batch.targets.reshape(
+        sample_batch.targets.shape[0], -1
+    ).shape[1]
     d_in = int(model_cfg.get("d_in", inferred_in))
     d_out = int(model_cfg.get("d_out", inferred_out))
     model_cfg.setdefault("d_in", d_in)
@@ -316,7 +377,9 @@ def _train_single(config: Mapping[str, object]) -> RunResult:
     if inferred_in != d_in:
         raise ValueError(f"Configured d_in={d_in} but observed batch has {inferred_in}")
     if inferred_out != d_out:
-        raise ValueError(f"Configured d_out={d_out} but observed batch has {inferred_out}")
+        raise ValueError(
+            f"Configured d_out={d_out} but observed batch has {inferred_out}"
+        )
 
     hidden_dims = _build_hidden(model_cfg)
     model_cfg["hidden"] = hidden_dims
@@ -324,7 +387,9 @@ def _train_single(config: Mapping[str, object]) -> RunResult:
 
     strategy = _build_strategy(model_cfg, dims, seed)
 
-    run_dir = _resolve_run_dir(train_cfg, dataset.name, model_cfg.get("strategy", "flip"))
+    run_dir = _resolve_run_dir(
+        train_cfg, dataset.name, model_cfg.get("strategy", "flip")
+    )
     run_dir.mkdir(parents=True, exist_ok=True)
 
     _print_startup_summary(
@@ -354,6 +419,9 @@ def _train_single(config: Mapping[str, object]) -> RunResult:
         quant=str(model_cfg.get("quant", "det")),
         seed=seed,
     )
+    optimizer_name = str(train_cfg.get("optimizer", "sgd")).lower()
+    if optimizer_name != "sgd":
+        raise ValueError("Only 'sgd' optimizer is currently supported")
     optimizer = SGDOptimizer(lr=float(train_cfg.get("lr", 0.01)))
     trainer = Trainer(
         model=model,
@@ -420,7 +488,9 @@ def _train_single(config: Mapping[str, object]) -> RunResult:
     )
 
 
-def _resolve_run_dir(train_cfg: Mapping[str, object], dataset: str, strategy: str) -> Path:
+def _resolve_run_dir(
+    train_cfg: Mapping[str, object], dataset: str, strategy: str
+) -> Path:
     if "run_dir" in train_cfg:
         return Path(train_cfg["run_dir"])
     timestamp = time.strftime("%Y%m%d-%H%M%S")
@@ -473,7 +543,9 @@ def _build_strategy(model_cfg: Mapping[str, object], dims: Sequence[int], seed: 
     if name == "dfa":
         return DFA(rng)
     if name == "ternary_dfa":
-        threshold = float(model_cfg.get("feedback_threshold", model_cfg.get("tau", 0.05)))
+        threshold = float(
+            model_cfg.get("feedback_threshold", model_cfg.get("tau", 0.05))
+        )
         return TernaryDFA(rng, threshold=threshold)
     if name == "backprop":
         return Backprop()

@@ -52,9 +52,8 @@ class LossRegistry:
             else:  # pragma: no cover - safeguard
                 raise ValueError(f"Unknown task type: {task_type}")
         if name not in self._registry:
-            raise KeyError(
-                f"Unknown loss {name!r}. Available losses: {', '.join(sorted(self._registry))}"
-            )
+            available = ", ".join(sorted(self._registry))
+            raise KeyError(f"Unknown loss {name!r}. Available losses: {available}")
         return self._registry[name]
 
 
@@ -104,7 +103,7 @@ def _cross_entropy(logits: Array, target: Array) -> tuple[float, Array]:
     probs = _softmax(logits)
     eps = 1e-9
     loss = float(-np.mean(np.sum(one_hot * np.log(probs + eps), axis=1)))
-    grad = (probs - one_hot)
+    grad = probs - one_hot
     return loss, grad
 
 
@@ -116,8 +115,10 @@ def _bce_with_logits(logits: Array, target: Array) -> tuple[float, Array]:
     target = target.astype(np.float32)
     probs = _sigmoid(logits)
     eps = 1e-9
-    loss = float(-np.mean(target * np.log(probs + eps) + (1 - target) * np.log(1 - probs + eps)))
-    grad = (probs - target)
+    loss = float(
+        -np.mean(target * np.log(probs + eps) + (1 - target) * np.log(1 - probs + eps))
+    )
+    grad = probs - target
     return loss, grad
 
 

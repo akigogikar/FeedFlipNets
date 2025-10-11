@@ -9,13 +9,8 @@ import numpy as np
 from sklearn.datasets import fetch_california_housing
 
 from ..core.types import Batch
-from .registry import DataSpec, DatasetSpec, register_dataset
-from .utils import (
-    batch_iterator,
-    deterministic_split,
-    resolve_cache_dir,
-    standardize,
-)
+from .registry import DatasetSpec, DataSpec, register_dataset
+from .utils import batch_iterator, deterministic_split, resolve_cache_dir, standardize
 
 
 def _offline_dataset() -> tuple[np.ndarray, np.ndarray]:
@@ -57,7 +52,9 @@ def build_california_dataset(
         y = dataset.target.astype(np.float32).reshape(-1, 1)
         provenance = {
             "mode": "download",
-            "sklearn_version": getattr(fetch_california_housing, "__module__", "sklearn"),
+            "sklearn_version": getattr(
+                fetch_california_housing, "__module__", "sklearn"
+            ),
         }
 
     normalization: dict[str, dict[str, list[float]]] = {}

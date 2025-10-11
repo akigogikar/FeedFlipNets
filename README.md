@@ -2,165 +2,104 @@
 
 ![CI](https://github.com/akigogikar/FeedFlipNets/actions/workflows/ci.yml/badge.svg)
 
-FeedFlipNets implements deterministic feedback-alignment experiments with ternary
-weights. The repository is structured into four focused packages—`core`, `data`,
-`training`, and `reporting`—with a thin CLI that wires them together. All
-pipelines are offline-first and produce reproducible metrics/artefacts suitable
-for publication workflows.
+FeedFlipNets is a compact research rig for experimenting with feedback-alignment
+(DFA), ternary quantisation, and classic backpropagation across multiple data
+modalities. The project bundles deterministic offline fixtures, manifest-driven
+artifacts, and a CLI so that classification, regression, and text workloads can
+run repeatably on a laptop or in CI without network access.
 
-## 90-second first run
-
-```bash
-# 1. Create the virtualenv and install pinned dependencies
-make bootstrap
-
-# 2. Run the lint + test suite (offline)
-make lint
-make test
-
-# 3. Execute the offline smoke preset and inspect outputs
-make smoke
-ls runs/basic-dfa-cpu
-```
-
-`make smoke` writes `metrics_train.jsonl`, `metrics_val.jsonl`,
-`metrics_test.json`, split CSV files, checkpoints, and `manifest.json` under
-`runs/basic-dfa-cpu/`. Running the command twice yields identical metrics hashes
-thanks to deterministic seeds.
-
-## CLI usage
-
-The CLI defaults to offline mode and the `basic_dfa_cpu` preset:
+## Quickstart
 
 ```bash
-python -m cli.main --preset basic_dfa_cpu --dump-config tmp/config.json
-python -m cli.main --preset synthetic-min --enable-plots --offline
+# 1. Install pinned dependencies into a virtual environment
+make setup
+
+# 2. Run formatting, linting, tests, and the offline smoke suite
+make format lint test smoke
+
+# 3. Launch a preset end-to-end run (defaults to offline fixtures)
+make run PRESET=mnist_mlp_dfa
 ```
 
-Optional `--config` overrides accept JSON or YAML files. When the override
-contains complete `data`/`model`/`train` sections it is treated as a standalone
-configuration; otherwise it patches the selected preset. The CLI exports the
-resolved configuration, including the offline flag, to the pipeline. When
-`FEEDFLIP_DATA_OFFLINE=1` (default) no network calls are attempted; fixtures are
-generated locally via the cache manifest.
+Each modality ships with an end-to-end preset under `configs/presets/`:
 
-### Training & evaluation controls
+| Modality            | Command                                                      | Notes |
+| ------------------- | ------------------------------------------------------------- | ----- |
+| Vision (MNIST)      | `make run PRESET=mnist_mlp_dfa`                               | Two hidden layers, DFA, ternary per-step |
+| Time series (UCR)   | `make run PRESET=ucr_gunpoint_mlp_dfa`                        | GunPoint offline fixture, DFA |
+| Tabular regression  | `make run PRESET=california_housing_mlp_dfa`                  | California Housing synthetic regression, ternary off |
+| Text (20 Newsgroups)| `make run PRESET=20newsgroups_bow_mlp_dfa`                    | HashingVectorizer features, DFA |
 
-The upgraded trainer is modality-aware and automatically selects sensible
-defaults for each dataset type. You can override the behaviour from the CLI:
+Presets declare dataset parameters, model topology, feedback strategy, ternary
+mode, optimiser, learning rate, epochs, batch size, and evaluation cadence. All
+runs write manifests, JSONL metrics, CSV summaries, and checkpoints inside the
+configured `train.run_dir`.
 
-- `--loss {auto,mse,mae,huber,ce,bce}` selects the loss function (auto uses the
-  dataset task type).
-- `--metrics default` or a comma-separated list (e.g. `accuracy,macro_f1`) drives
-  the per-split evaluation.
-- `--feedback {flip,dfa,structured,backprop,ternary_dfa}` swaps feedback
-  strategies while keeping the legacy names available.
-- `--ternary {off,per_step,per_epoch}` and `--ternary-threshold` control the
-  quantisation schedule.
-- `--eval-every` and `--early-stopping-patience` enable validation-driven early
-  stopping and periodic evaluation.
+### Sweeps in one command
 
-Each run prints a concise startup summary with dataset, inferred dimensions,
-loss/metric selections, feedback strategy, ternary mode, and parameter count.
-
-### Datasets & offline fixtures
-
-FeedFlipNets exposes a unified dataset registry via `feedflipnets.data`. The
-built-in loaders cover MNIST, UCR/UEA time-series (defaulting to GunPoint), the
-California Housing regression task, 20 Newsgroups text classification, and
-generic CSV regression/classification adapters. Every loader supports
-deterministic `train`/`val`/`test` splits, `seed` overrides, and an offline mode
-powered by deterministic synthetic fixtures (CSV helpers ship text fixtures in
-`feedflipnets/data/_fixtures/`). To explore a dataset without touching presets:
+Grid sweeps over feedback strategy, ternary schedule, learning rate, and hidden
+widths can be launched with:
 
 ```bash
-python -m cli.main --dataset mnist --offline --val-split 0.05 --test-split 0.1
-python -m cli.main --dataset ucr --ucr-name GunPoint --seed 123
-python -m cli.main --dataset csv_regression --csv-path feedflipnets/data/_fixtures/csv_regression_fixture.csv
+python -m scripts.preset_sweep --preset mnist_mlp_dfa \
+  --feedback backprop dfa ternary_dfa \
+  --ternary off per_step \
+  --lr 0.1 0.01 \
+  --hidden 128 256
 ```
 
-Set `FFN_CACHE_DIR=...` to control the download cache location and
-`FFN_DATA_OFFLINE=0` to allow network fetches for the real datasets. The helper
-script `scripts/smoke_datasets.sh` runs a fast offline sanity check across all
-registered datasets.
+The script clones the preset configuration, adjusts the requested knobs, and
+stores each run under `runs/sweeps/<preset>/feedback-.../`.
 
-### Run an experiment from the registry
+## Dataset modes
 
-```bash
-python -m cli.main --experiment dfa_baseline
-python -m cli.main --experiment dfa_baseline  # identical metrics + summary bytes
-```
+FeedFlipNets datasets default to deterministic offline fixtures so smoke tests
+never touch the network. Switching to the real datasets is as simple as passing
+`--no-offline` or setting `FEEDFLIP_DATA_OFFLINE=0`.
 
-Registry-backed runs derive a deterministic `run_id` from the configuration
-hash. Artefacts are written to `.artifacts/<run_id>/` with
-`metrics.jsonl`, `summary.json`, and the manifest. Re-running the same
-experiment reuses the directory and produces byte-identical outputs.
+| Dataset              | Offline fixture characteristics                               | Online toggle |
+| -------------------- | ------------------------------------------------------------- | ------------- |
+| `mnist`              | Linearly separable synthetic digits (10×64 samples)           | `--no-offline` downloads the classic MNIST archive |
+| `ucr`                | Class-specific sinusoid time series with noise                | `--no-offline --ucr-name <dataset>` pulls from UCR/UEA |
+| `california_housing` | Linear regression with Gaussian noise, standardised features  | `--no-offline` fetches via scikit-learn |
+| `20newsgroups`       | Sparse hashing-vectorised pseudo-documents per class          | `--no-offline --text-subset train` streams from scikit-learn |
 
-### Build a paper bundle
+Additional CSV helpers and custom datasets are documented in
+[`docs/how_to_add_dataset.md`](docs/how_to_add_dataset.md).
 
-After an experiment completes, generate a reproducible archive:
+## Losses, metrics, and ternary support
 
-```bash
-python scripts/build_paper_bundle.py --run-dir .artifacts/<run_id> --include-plots
-```
+| Task type      | Default loss (`--loss auto`) | Default metrics            | Ternary scheduling (`--ternary`) | Feedback strategies (`--feedback`) |
+| -------------- | ---------------------------- | -------------------------- | -------------------------------- | ---------------------------------- |
+| Regression     | MSE                          | `mae`, `mse`               | `off`, `per_epoch`, `per_step`  | `backprop`, `dfa`, `ternary_dfa`   |
+| Multiclass     | Cross-entropy                | `accuracy`, `macro_f1`     | `off`, `per_step`               | `backprop`, `dfa`, `ternary_dfa`   |
+| Binary         | BCE                          | `accuracy`, `auc`          | `off`, `per_step`               | `backprop`, `dfa`, `ternary_dfa`   |
 
-The script copies metrics, recomputes a deterministic summary, materialises
-CSV tables, renders optional plots using the Agg backend, and writes a
-`paper_bundle.zip` alongside the `paper_bundle/` directory for upload.
+The trainer chooses defaults based on the dataset metadata but every preset can
+override them in its YAML/JSON. CLI flags mirror the config keys for interactive
+experimentation.
 
-## Module map
+## Reproducibility checklist
 
-```text
-feedflipnets/
-  core/        -> numerical primitives (activations, quant, strategies, types)
-  data/        -> dataset registry, cache manifest, offline loaders
-  training/    -> trainer abstraction, pipelines, schedulers
-  reporting/   -> metrics sinks (JSONL/CSV), headless plotting, manifests
-  cli/         -> argparse entrypoint with presets and config overrides
-```
+- Every preset specifies `train.seed`; the trainer derives deterministic child
+  seeds for validation/test loaders and quantisation.
+- `manifest.json` captures the resolved configuration, dataset provenance, and
+  package versions so runs can be replayed later.
+- Metrics are written as JSONL (`metrics_<split>.jsonl`) and CSV files alongside
+  a snapshot of the last test metrics (`metrics_test.json`).
+- `make smoke` replays all presets offline and is wired into CI, guaranteeing
+  end-to-end coverage on clean clones.
 
-Key architecture rules:
+## Tooling
 
-- `core` has no dependencies on other packages.
-- `data` depends on `core` only; loaders rely on the cache manifest for offline
-  provenance.
-- `training` orchestrates `core`, `data`, and `reporting` components.
-- `reporting` consumes `core` utilities only, ensuring headless execution.
+- `make setup` — create a virtual environment, install pinned dependencies, and
+  register pre-commit hooks.
+- `make format` / `make lint` — run `isort`, `black`, `ruff`, and `flake8` over
+  `cli/`, `feedflipnets/`, `scripts/`, and `tests/`.
+- `make test` — execute the offline pytest suite.
+- `make smoke` — execute all presets offline, writing metrics to `runs/`.
+- `.pre-commit-config.yaml` — standardises formatting, linting, and whitespace
+  hygiene before committing.
 
-See [`_design/ARCHITECTURE_TARGET.md`](./_design/ARCHITECTURE_TARGET.md) for the
-full dependency matrix and Mermaid diagram.
-
-## Development workflow
-
-- **Install** – `make bootstrap`
-- **Lint** – `make lint` (Ruff + Black + Import Linter contracts)
-- **Test** – `make test` (offline, coverage ≥ 75%)
-- **Smoke** – `make smoke` (offline deterministic preset)
-
-The dependency lock file (`requirements-lock.txt`) is the single source of truth
-for tooling. All tests and smoke runs set `FEEDFLIP_DATA_OFFLINE=1` to prevent
-network calls.
-
-## Reporting artefacts
-
-`feedflipnets.reporting.metrics.JsonlSink` records per-epoch metrics for each
-split (`metrics_train.jsonl`, `metrics_val.jsonl`, `metrics_test.jsonl`). The
-`CsvSink` mirrors the schema for spreadsheet workflows. A compact
-`metrics_test.json` captures the last test metrics, while `best.ckpt` and
-`last.ckpt` store model weights for reproducibility. `PlotAdapter` writes loss
-curves using the Agg backend so that CI remains headless. Manifests include Git
-SHA, dataset provenance (with checksums), and runtime environment details.
-
-## Legacy shims
-
-`feedflipnets.train` exposes `train_single` and `sweep_and_log` for backwards
-compatibility. The functions forward to the new pipeline and emit
-`DeprecationWarning`s with upgrade guidance. Modern consumers should rely on the
-CLI or call `feedflipnets.training.pipelines.run_pipeline` directly.
-
-## Further reading
-
-- [`_design/MIGRATION_RUNBOOK.md`](./_design/MIGRATION_RUNBOOK.md) – phased
-  rollout plan with rollback steps.
-- [`UPGRADING.md`](./UPGRADING.md) – guidance for migrating legacy scripts.
-- [`CHANGELOG.md`](./CHANGELOG.md) – highlights for the v1.0.0 release cycle.
+Refer to [`CONTRIBUTING.md`](CONTRIBUTING.md) for coding standards and release
+policies.

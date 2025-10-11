@@ -1,0 +1,22 @@
+offline: true
+data:
+  name: california_housing
+  options:
+    seed: 5
+    val_split: 0.2
+    test_split: 0.2
+    standardize_inputs: true
+    standardize_targets: false
+model:
+  hidden: [128, 64]
+  quant: det
+  strategy: dfa
+train:
+  seed: 5
+  batch_size: 64
+  epochs: 8
+  eval_every: 1
+  lr: 0.01
+  optimizer: sgd
+  ternary: "off"
+  run_dir: runs/california-housing-mlp-dfa

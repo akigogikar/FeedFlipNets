@@ -9,9 +9,11 @@ import numpy as np
 
 from .utils import download_file
 
-
 _DEF_PATH = os.path.join("datasets_cache", "tinystories.txt")
-_HF_URL = "https://raw.githubusercontent.com/karpathy/tinygrad/master/extra/TinyStories-short.txt"
+_HF_URL = (
+    "https://raw.githubusercontent.com/karpathy/tinygrad/master/extra/"
+    "TinyStories-short.txt"
+)
 
 
 def load_tinystories(path: str = _DEF_PATH) -> Tuple[np.ndarray]:

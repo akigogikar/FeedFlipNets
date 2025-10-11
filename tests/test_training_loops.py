@@ -38,7 +38,9 @@ class _Capture:
         self.history.append((epoch, {k: float(v) for k, v in metrics.items()}))
 
 
-def _make_batches(inputs: np.ndarray, targets: np.ndarray, batch_size: int) -> List[Batch]:
+def _make_batches(
+    inputs: np.ndarray, targets: np.ndarray, batch_size: int
+) -> List[Batch]:
     batches: List[Batch] = []
     for start in range(0, inputs.shape[0], batch_size):
         end = start + batch_size
@@ -49,7 +51,9 @@ def _make_batches(inputs: np.ndarray, targets: np.ndarray, batch_size: int) -> L
 def test_regression_training_improves_r2(tmp_path) -> None:
     rng = np.random.default_rng(0)
     x = np.linspace(-1.0, 1.0, 128, dtype=np.float32).reshape(-1, 1)
-    y = np.sin(np.pi * x).astype(np.float32) + 0.05 * rng.standard_normal(x.shape, dtype=np.float32)
+    y = np.sin(np.pi * x).astype(np.float32) + 0.05 * rng.standard_normal(
+        x.shape, dtype=np.float32
+    )
     batches = _make_batches(x, y, batch_size=16)
     loader = _LoopLoader(batches)
 

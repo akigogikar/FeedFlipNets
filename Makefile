@@ -1,38 +1,52 @@
-.PHONY: bootstrap lint test smoke perf bundle release-rc bench
+.PHONY: setup test smoke format lint run precommit clean
 
 VENV ?= .venv
 PYTHON ?= python3
 PIP := $(VENV)/bin/pip
-PYTEST := $(VENV)/bin/pytest
-RUFF := $(VENV)/bin/ruff
+PYTHON_BIN := $(VENV)/bin/python
 BLACK := $(VENV)/bin/black
-IMPORTLINTER := $(VENV)/bin/lint-imports
+ISORT := $(VENV)/bin/isort
+RUFF := $(VENV)/bin/ruff
+FLAKE8 := $(VENV)/bin/flake8
+PYTEST := $(VENV)/bin/pytest
+PRECOMMIT := $(VENV)/bin/pre-commit
 
-bootstrap:
-	$(PYTHON) -m venv $(VENV)
+SETUP_PATHS := cli feedflipnets scripts tests
+SMOKE_PRESETS := mnist_mlp_dfa ucr_gunpoint_mlp_dfa california_housing_mlp_dfa 20newsgroups_bow_mlp_dfa
+
+setup:
+	@[ -d $(VENV) ] || $(PYTHON) -m venv $(VENV)
+	$(PIP) install --upgrade pip
 	$(PIP) install -r requirements-lock.txt
+	$(PRECOMMIT) install
+
+format:
+	$(ISORT) $(SETUP_PATHS)
+	$(BLACK) $(SETUP_PATHS)
 
 lint:
-	$(RUFF) check cli feedflipnets tests
-	$(BLACK) --check cli feedflipnets tests
-	$(IMPORTLINTER)
+	$(RUFF) check $(SETUP_PATHS)
+	$(FLAKE8) $(SETUP_PATHS)
+	$(BLACK) --check $(SETUP_PATHS)
+
+precommit:
+	$(PRECOMMIT) run --all-files
 
 test:
-	PYTHONPATH=. FEEDFLIP_DATA_OFFLINE=1 $(PYTEST) -m "not network and not perf" --cov=feedflipnets --cov-report=term-missing --cov-fail-under=75
+	FEEDFLIP_DATA_OFFLINE=1 PYTHONPATH=. $(PYTEST) -q
 
 smoke:
-	PYTHONPATH=. FEEDFLIP_DATA_OFFLINE=1 $(VENV)/bin/python -m cli.main --preset basic_dfa_cpu
+	@for preset in $(SMOKE_PRESETS); do \
+		echo "==> $$preset"; \
+		FEEDFLIP_DATA_OFFLINE=1 PYTHONPATH=. $(PYTHON_BIN) -m cli.main --preset $$preset --offline; \
+	done
 
-perf:
-	PYTHONPATH=. FEEDFLIP_DATA_OFFLINE=1 $(PYTEST) -m "perf" --maxfail=1
+run:
+	@if [ -z "$(PRESET)" ]; then \
+		echo "Usage: make run PRESET=<preset> [EXTRA_ARGS='--feedback dfa']"; \
+		exit 1; \
+	fi
+	FEEDFLIP_DATA_OFFLINE=1 PYTHONPATH=. $(PYTHON_BIN) -m cli.main --preset $(PRESET) $(EXTRA_ARGS)
 
-bundle:
-	@latest=$$(ls -td .artifacts/* 2>/dev/null | head -n 1); \
-	if [ -z "$$latest" ]; then echo "No artifacts found in .artifacts"; exit 1; fi; \
-	PYTHONPATH=. FEEDFLIP_DATA_OFFLINE=1 $(VENV)/bin/python scripts/build_paper_bundle.py --run-dir "$$latest" --out paper_bundle --include-plots
-
-release-rc:
-        @echo "FeedFlipNets v1.0.0-rc1 candidate ready. Run make lint test perf bundle before tagging."
-
-bench:
-        . .venv/bin/activate && python scripts/bench_micro.py --out .artifacts/bench
+clean:
+	rm -rf $(VENV)

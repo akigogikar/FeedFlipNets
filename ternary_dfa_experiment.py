@@ -7,11 +7,7 @@ import these utilities from this top level module.  To keep backwards
 compatibility we re-export the relevant functions and ``main``.
 """
 
-from experiments.ternary_dfa_experiment import (
-    main,
-    parse_args,
-    sweep_and_log,
-)
+from experiments.ternary_dfa_experiment import main, parse_args, sweep_and_log
 from feedflipnets.utils import make_dataset
 
 __all__ = ["main", "parse_args", "sweep_and_log", "make_dataset"]

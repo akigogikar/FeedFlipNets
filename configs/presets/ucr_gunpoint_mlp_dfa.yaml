@@ -1,0 +1,21 @@
+offline: true
+data:
+  name: ucr
+  options:
+    ucr_name: GunPoint
+    seed: 11
+    val_split: 0.2
+    test_split: 0.2
+model:
+  hidden: [128, 128]
+  quant: det
+  strategy: dfa
+train:
+  seed: 11
+  batch_size: 32
+  epochs: 6
+  eval_every: 1
+  lr: 0.02
+  optimizer: sgd
+  ternary: per_step
+  run_dir: runs/ucr-gunpoint-mlp-dfa

@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Iterator
 
 import numpy as np
 
 from ...core.types import Batch
-from ..registry import DataSpec, DatasetSpec, register_dataset
+from ..registry import DatasetSpec, DataSpec, register_dataset
 from ..utils import batch_iterator, deterministic_split
 
 

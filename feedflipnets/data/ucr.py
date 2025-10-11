@@ -10,7 +10,7 @@ import numpy as np
 
 from ..core.types import Batch
 from .cache import CacheError, fetch
-from .registry import DataSpec, DatasetSpec, register_dataset
+from .registry import DatasetSpec, DataSpec, register_dataset
 from .utils import batch_iterator, deterministic_split, resolve_cache_dir
 
 BASE_URL = "https://www.timeseriesclassification.com/Downloads/{name}.zip"
@@ -59,20 +59,34 @@ def _load_from_zip(path: Path, dataset: str) -> tuple[np.ndarray, np.ndarray]:
 
 
 def _offline_dataset(dataset: str) -> tuple[np.ndarray, np.ndarray]:
-    """Return a deterministic synthetic UCR-style dataset for offline mode."""
+    """Return a deterministic, class-structured UCR-style dataset."""
 
     encoded = dataset.lower().encode("utf-8")
     seed = int.from_bytes(encoded, "little", signed=False) % (2**32 - 1)
     seed = max(seed, 1)
     rng = np.random.default_rng(seed)
 
-    n_samples = 180
-    sequence_length = int(64 + seed % 32)
-    num_classes = int(max(2, (seed % 5) + 2))
+    sequence_length = int(80 + (seed % 40))
+    num_classes = int(max(2, (seed % 4) + 2))
+    samples_per_class = 48
 
-    X = rng.normal(loc=0.0, scale=1.0, size=(n_samples, sequence_length)).astype(np.float32)
-    y = rng.integers(0, num_classes, size=n_samples, dtype=np.int64)
-    return X, y
+    time_axis = np.linspace(0.0, 2.0 * np.pi, sequence_length, dtype=np.float32)
+    X: list[np.ndarray] = []
+    y: list[int] = []
+
+    base_freqs = np.linspace(0.5, 2.0, num_classes)
+    base_phases = np.linspace(0.0, np.pi / 2.0, num_classes)
+
+    for cls, (freq, phase) in enumerate(zip(base_freqs, base_phases)):
+        prototype = np.sin(freq * time_axis + phase).astype(np.float32)
+        for _ in range(samples_per_class):
+            scale = rng.uniform(0.8, 1.2)
+            drift = rng.normal(0.0, 0.1, size=sequence_length).astype(np.float32)
+            sample = scale * prototype + drift
+            X.append(sample)
+            y.append(cls)
+
+    return np.stack(X, axis=0), np.asarray(y, dtype=np.int64)
 
 
 @register_dataset("ucr")

@@ -1,0 +1,22 @@
+offline: true
+data:
+  name: 20newsgroups
+  options:
+    subset: all
+    n_features: 2048
+    seed: 13
+    val_split: 0.2
+    test_split: 0.2
+model:
+  hidden: [512, 256]
+  quant: det
+  strategy: dfa
+train:
+  seed: 13
+  batch_size: 64
+  epochs: 6
+  eval_every: 1
+  lr: 0.05
+  optimizer: sgd
+  ternary: per_step
+  run_dir: runs/20newsgroups-bow-mlp-dfa
