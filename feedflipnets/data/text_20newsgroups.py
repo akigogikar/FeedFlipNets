@@ -25,9 +25,7 @@ def _offline_dataset(n_features: int) -> tuple[np.ndarray, np.ndarray]:
     anchors: list[np.ndarray] = []
     for cls in range(num_classes):
         anchor = np.zeros(n_features, dtype=np.float32)
-        active = rng.choice(
-            n_features, size=min(tokens_per_doc * 2, n_features), replace=False
-        )
+        active = rng.choice(n_features, size=min(tokens_per_doc * 2, n_features), replace=False)
         anchor[active] = rng.uniform(0.6, 1.0, size=active.size).astype(np.float32)
         anchors.append(anchor)
 
@@ -41,9 +39,7 @@ def _offline_dataset(n_features: int) -> tuple[np.ndarray, np.ndarray]:
             noise_idx = rng.choice(
                 n_features, size=min(tokens_per_doc // 2 + 1, n_features), replace=False
             )
-            doc[noise_idx] += rng.uniform(0.0, 0.3, size=noise_idx.size).astype(
-                np.float32
-            )
+            doc[noise_idx] += rng.uniform(0.0, 0.3, size=noise_idx.size).astype(np.float32)
             documents.append(doc)
             labels.append(cls)
 
@@ -89,22 +85,16 @@ def build_20newsgroups(
         }
 
     num_classes = int(np.max(y)) + 1 if y.size else 0
-    y_one_hot = (
-        np.eye(num_classes, dtype=np.float32)[y] if num_classes else y.reshape(-1, 1)
-    )
+    y_one_hot = np.eye(num_classes, dtype=np.float32)[y] if num_classes else y.reshape(-1, 1)
 
-    splits = deterministic_split(
-        X.shape[0], val_split=val_split, test_split=test_split, seed=seed
-    )
+    splits = deterministic_split(X.shape[0], val_split=val_split, test_split=test_split, seed=seed)
 
     def loader(split: str, batch_size: int) -> Iterator[Batch]:
         if split not in {"train", "val", "test"}:
             raise ValueError(f"Unknown split: {split}")
         indices = getattr(splits, split)
         split_seed = seed + {"train": 0, "val": 1, "test": 2}[split]
-        return batch_iterator(
-            X, y_one_hot, indices, batch_size=batch_size, seed=split_seed
-        )
+        return batch_iterator(X, y_one_hot, indices, batch_size=batch_size, seed=split_seed)
 
     data_spec = DataSpec(
         d_in=int(X.shape[1]),

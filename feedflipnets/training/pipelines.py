@@ -193,9 +193,7 @@ def _read_preset_file(path: Path) -> Mapping[str, object]:
         try:
             import yaml  # type: ignore
         except Exception as exc:  # pragma: no cover - optional dependency
-            raise RuntimeError(
-                "PyYAML is required to load preset files in YAML format"
-            ) from exc
+            raise RuntimeError("PyYAML is required to load preset files in YAML format") from exc
         data = yaml.safe_load(text) or {}
     elif suffix == ".json":
         data = json.loads(text or "{}")
@@ -220,10 +218,7 @@ def _file_presets() -> Dict[str, Mapping[str, object]]:
                 missing = required - set(data)
                 if missing:
                     missing_str = ", ".join(sorted(missing))
-                    message = (
-                        f"Preset {file.name} is missing required sections: "
-                        f"{missing_str}"
-                    )
+                    message = f"Preset {file.name} is missing required sections: " f"{missing_str}"
                     raise KeyError(message)
                 presets[file.stem] = json.loads(json.dumps(data))
         _FILE_PRESETS_CACHE = presets
@@ -275,9 +270,7 @@ class _SplitLoader:
     def __iter__(self) -> Iterable[Batch]:
         rng_seed = self.seed + self._epoch
         self._epoch += 1
-        return registry.iter_batches(
-            self.spec, self.split, self.batch_size, seed=rng_seed
-        )
+        return registry.iter_batches(self.spec, self.split, self.batch_size, seed=rng_seed)
 
     def __len__(self) -> int:
         return max(1, self.steps)
@@ -352,9 +345,7 @@ def _train_single(config: Mapping[str, object]) -> RunResult:
         fallback = max(1, int(train_size * 0.1)) if train_size else batch_size
         split_sizes["test"] = fallback
 
-    steps_per_epoch, val_steps, test_steps = _resolve_steps(
-        split_sizes, batch_size, train_cfg
-    )
+    steps_per_epoch, val_steps, test_steps = _resolve_steps(split_sizes, batch_size, train_cfg)
 
     train_loader = _SplitLoader(dataset, "train", batch_size, seed, steps_per_epoch)
     val_loader = None
@@ -366,9 +357,7 @@ def _train_single(config: Mapping[str, object]) -> RunResult:
 
     sample_batch = next(iter(dataset.loader("train", 1)))
     inferred_in = sample_batch.inputs.reshape(sample_batch.inputs.shape[0], -1).shape[1]
-    inferred_out = sample_batch.targets.reshape(
-        sample_batch.targets.shape[0], -1
-    ).shape[1]
+    inferred_out = sample_batch.targets.reshape(sample_batch.targets.shape[0], -1).shape[1]
     d_in = int(model_cfg.get("d_in", inferred_in))
     d_out = int(model_cfg.get("d_out", inferred_out))
     model_cfg.setdefault("d_in", d_in)
@@ -377,9 +366,7 @@ def _train_single(config: Mapping[str, object]) -> RunResult:
     if inferred_in != d_in:
         raise ValueError(f"Configured d_in={d_in} but observed batch has {inferred_in}")
     if inferred_out != d_out:
-        raise ValueError(
-            f"Configured d_out={d_out} but observed batch has {inferred_out}"
-        )
+        raise ValueError(f"Configured d_out={d_out} but observed batch has {inferred_out}")
 
     hidden_dims = _build_hidden(model_cfg)
     model_cfg["hidden"] = hidden_dims
@@ -387,9 +374,7 @@ def _train_single(config: Mapping[str, object]) -> RunResult:
 
     strategy = _build_strategy(model_cfg, dims, seed)
 
-    run_dir = _resolve_run_dir(
-        train_cfg, dataset.name, model_cfg.get("strategy", "flip")
-    )
+    run_dir = _resolve_run_dir(train_cfg, dataset.name, model_cfg.get("strategy", "flip"))
     run_dir.mkdir(parents=True, exist_ok=True)
 
     _print_startup_summary(
@@ -465,9 +450,7 @@ def _train_single(config: Mapping[str, object]) -> RunResult:
         dataset_provenance=dataset.provenance,
     )
     summary_tail = int(train_cfg.get("summary_tail", 32))
-    summary_path = write_summary(
-        train_jsonl.path, run_dir / "summary.json", tail=summary_tail
-    )
+    summary_path = write_summary(train_jsonl.path, run_dir / "summary.json", tail=summary_tail)
 
     config_path = run_dir / "config.json"
     config_path.write_text(json.dumps(_safe_config(config, hidden_dims), indent=2))
@@ -488,9 +471,7 @@ def _train_single(config: Mapping[str, object]) -> RunResult:
     )
 
 
-def _resolve_run_dir(
-    train_cfg: Mapping[str, object], dataset: str, strategy: str
-) -> Path:
+def _resolve_run_dir(train_cfg: Mapping[str, object], dataset: str, strategy: str) -> Path:
     if "run_dir" in train_cfg:
         return Path(train_cfg["run_dir"])
     timestamp = time.strftime("%Y%m%d-%H%M%S")
@@ -543,18 +524,14 @@ def _build_strategy(model_cfg: Mapping[str, object], dims: Sequence[int], seed: 
     if name == "dfa":
         return DFA(rng)
     if name == "ternary_dfa":
-        threshold = float(
-            model_cfg.get("feedback_threshold", model_cfg.get("tau", 0.05))
-        )
+        threshold = float(model_cfg.get("feedback_threshold", model_cfg.get("tau", 0.05)))
         return TernaryDFA(rng, threshold=threshold)
     if name == "backprop":
         return Backprop()
     if name == "structured":
         structure_type = model_cfg.get("structure_type")
         if structure_type is None:
-            raise KeyError(
-                "Structured strategy requires `structure_type` in the model config"
-            )
+            raise KeyError("Structured strategy requires `structure_type` in the model config")
         refresh = str(model_cfg.get("feedback_refresh", "fixed"))
         rank = model_cfg.get("rank")
         blocks = model_cfg.get("blocks")
@@ -568,9 +545,7 @@ def _build_strategy(model_cfg: Mapping[str, object], dims: Sequence[int], seed: 
     raise ValueError(f"Unknown strategy: {name}")
 
 
-def _safe_config(
-    config: Mapping[str, object], hidden_dims: Iterable[int]
-) -> Mapping[str, object]:
+def _safe_config(config: Mapping[str, object], hidden_dims: Iterable[int]) -> Mapping[str, object]:
     copied = json.loads(json.dumps(config))
     copied.setdefault("model", {})["hidden"] = list(hidden_dims)
     return copied

@@ -150,9 +150,7 @@ def sweep_and_log(
     }
     (out_path / "summary.json").write_text(json.dumps(summary, indent=2))
 
-    final_tables: Dict[str, np.ndarray] = {
-        m: np.zeros((len(depths), len(freqs))) for m in methods
-    }
+    final_tables: Dict[str, np.ndarray] = {m: np.zeros((len(depths), len(freqs))) for m in methods}
 
     for method in methods:
         for i, depth in enumerate(depths):

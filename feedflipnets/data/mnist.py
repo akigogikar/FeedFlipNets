@@ -35,9 +35,7 @@ def _prepare_inputs(images: np.ndarray) -> np.ndarray:
     return images.astype(np.float32)
 
 
-def _prepare_targets(
-    labels: np.ndarray, *, one_hot: bool, num_classes: int
-) -> np.ndarray:
+def _prepare_targets(labels: np.ndarray, *, one_hot: bool, num_classes: int) -> np.ndarray:
     labels = labels.astype(np.int64)
     if one_hot:
         eye = np.eye(num_classes, dtype=np.float32)
@@ -120,9 +118,7 @@ def build_mnist(
             raise ValueError(f"Unknown split: {split}")
         indices = getattr(splits, split)
         split_seed = seed + {"train": 0, "val": 1, "test": 2}[split]
-        return batch_iterator(
-            inputs, targets, indices, batch_size=batch_size, seed=split_seed
-        )
+        return batch_iterator(inputs, targets, indices, batch_size=batch_size, seed=split_seed)
 
     target_dim = 10 if one_hot else 1
     data_spec = DataSpec(

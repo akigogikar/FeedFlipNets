@@ -25,9 +25,7 @@ def quantize_ternary_det(weights: Array, tau: float) -> Array:
     return out
 
 
-def quantize_ternary_stoch(
-    weights: Array, tau: float, rng: np.random.Generator
-) -> Array:
+def quantize_ternary_stoch(weights: Array, tau: float, rng: np.random.Generator) -> Array:
     """Stochastic ternary quantisation matching the legacy behaviour."""
 
     noise = rng.uniform(-tau, tau, size=weights.shape)

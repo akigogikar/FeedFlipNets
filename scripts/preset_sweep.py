@@ -80,9 +80,7 @@ def main(argv: Iterable[str] | None = None) -> None:
     output_root = Path(args.output_dir) / args.preset
     output_root.mkdir(parents=True, exist_ok=True)
 
-    combinations = itertools.product(
-        feedback_values, ternary_values, lr_values, hidden_values
-    )
+    combinations = itertools.product(feedback_values, ternary_values, lr_values, hidden_values)
 
     for feedback, ternary, lr, hidden in combinations:
         config = json.loads(json.dumps(base))
@@ -99,9 +97,7 @@ def main(argv: Iterable[str] | None = None) -> None:
         train_cfg["ternary"] = resolved_ternary
         train_cfg["lr"] = float(lr)
 
-        run_name = (
-            f"feedback-{feedback}_ternary-{resolved_ternary}_lr-{lr:g}_hidden-{hidden}"
-        )
+        run_name = f"feedback-{feedback}_ternary-{resolved_ternary}_lr-{lr:g}_hidden-{hidden}"
         run_dir = output_root / run_name.replace(".", "p")
         train_cfg["run_dir"] = str(run_dir)
 
