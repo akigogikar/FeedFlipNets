@@ -1,21 +1,27 @@
-"""Pipeline assembly for FeedFlipNets."""
+"""Pipeline assembly for FeedFlipNets with modality-aware training."""
 
 from __future__ import annotations
 
 import json
 import math
+import time
 from copy import deepcopy
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Mapping, Sequence
 
 import numpy as np
 
-from ..core.strategies import DFA, FlipTernary, StructuredFeedback
-from ..core.types import RunResult
+from ..core.strategies import (
+    Backprop,
+    DFA,
+    FlipTernary,
+    StructuredFeedback,
+    TernaryDFA,
+)
+from ..core.types import Batch, RunResult
 from ..data import registry
 from ..reporting.artifacts import write_manifest
 from ..reporting.metrics import CsvSink, JsonlSink
-from ..reporting.plots import PlotAdapter
 from ..reporting.summary import write_summary
 from .trainer import FeedForwardModel, SGDOptimizer, Trainer
 
@@ -200,6 +206,37 @@ def run_pipeline(config: Mapping[str, object]) -> RunResult | List[RunResult]:
     return _train_single(config)
 
 
+class _SplitLoader:
+    """Re-iterable loader with deterministic reseeding per epoch."""
+
+    def __init__(self, spec: registry.DatasetSpec, split: str, batch_size: int, seed: int, steps: int) -> None:
+        self.spec = spec
+        self.split = split
+        self.batch_size = batch_size
+        self.seed = seed
+        self.steps = steps
+        self._epoch = 0
+
+    def __iter__(self) -> Iterable[Batch]:
+        rng_seed = self.seed + self._epoch
+        self._epoch += 1
+        return registry.iter_batches(self.spec, self.split, self.batch_size, seed=rng_seed)
+
+    def __len__(self) -> int:
+        return max(1, self.steps)
+
+
+class _MetricsCapture:
+    def __init__(self) -> None:
+        self.history: list[tuple[int, Mapping[str, float]]] = []
+        self.last: Mapping[str, float] = {}
+
+    def on_epoch(self, epoch: int, metrics: Mapping[str, float]) -> None:
+        payload = {k: float(v) for k, v in metrics.items()}
+        self.history.append((int(epoch), payload))
+        self.last = payload
+
+
 def _run_sweep(config: Mapping[str, object]) -> List[RunResult]:
     sweep_cfg = config["sweep"]
     results: List[RunResult] = []
@@ -234,27 +271,82 @@ def _train_single(config: Mapping[str, object]) -> RunResult:
         **data_cfg.get("options", {}),
     )
     data_spec = dataset.data_spec
-    model_cfg.setdefault("d_in", int(data_spec.d_in))
-    model_cfg.setdefault("d_out", int(data_spec.d_out))
+
     batch_size = int(train_cfg.get("batch_size", 1))
-    data_iter = _IterableLoader(lambda: dataset.loader("train", batch_size))
+    seed = int(train_cfg.get("seed", 0))
+    eval_every = int(train_cfg.get("eval_every", 1))
+    early_stopping = train_cfg.get("early_stopping_patience")
+    early_stopping = int(early_stopping) if early_stopping is not None else None
+    loss_name = str(train_cfg.get("loss", "auto"))
+    metrics_cfg = train_cfg.get("metrics", "default")
+    if isinstance(metrics_cfg, str):
+        metrics_list = metrics_cfg
+    else:
+        metrics_list = ",".join(str(item) for item in metrics_cfg)
+
+    ternary_mode = str(train_cfg.get("ternary", "per_step"))
+    ternary_threshold = train_cfg.get("ternary_threshold")
+    if ternary_threshold is not None:
+        model_cfg["tau"] = float(ternary_threshold)
+
+    split_sizes = dict(dataset.splits)
+    if split_sizes.get("test", 0) == 0:
+        train_size = int(split_sizes.get("train", 0))
+        fallback = max(1, int(train_size * 0.1)) if train_size else batch_size
+        split_sizes["test"] = fallback
+
+    steps_per_epoch, val_steps, test_steps = _resolve_steps(split_sizes, batch_size, train_cfg)
+
+    train_loader = _SplitLoader(dataset, "train", batch_size, seed, steps_per_epoch)
+    val_loader = None
+    if split_sizes.get("val", 0) > 0:
+        val_loader = _SplitLoader(dataset, "val", batch_size, seed + 1, val_steps)
+    test_loader = None
+    if split_sizes.get("test", 0) > 0:
+        test_loader = _SplitLoader(dataset, "test", batch_size, seed + 2, test_steps)
+
+    sample_batch = next(iter(dataset.loader("train", 1)))
+    inferred_in = sample_batch.inputs.reshape(sample_batch.inputs.shape[0], -1).shape[1]
+    inferred_out = sample_batch.targets.reshape(sample_batch.targets.shape[0], -1).shape[1]
+    d_in = int(model_cfg.get("d_in", inferred_in))
+    d_out = int(model_cfg.get("d_out", inferred_out))
+    model_cfg.setdefault("d_in", d_in)
+    model_cfg.setdefault("d_out", d_out)
+
+    if inferred_in != d_in:
+        raise ValueError(f"Configured d_in={d_in} but observed batch has {inferred_in}")
+    if inferred_out != d_out:
+        raise ValueError(f"Configured d_out={d_out} but observed batch has {inferred_out}")
 
     hidden_dims = _build_hidden(model_cfg)
     model_cfg["hidden"] = hidden_dims
     dims = _build_dims(model_cfg)
 
-    seed = int(train_cfg.get("seed", 0))
-    epochs, steps_per_epoch = _resolve_schedule(train_cfg)
     strategy = _build_strategy(model_cfg, dims, seed)
 
-    run_dir = Path(train_cfg.get("run_dir", "runs/default"))
+    run_dir = _resolve_run_dir(train_cfg, dataset.name, model_cfg.get("strategy", "flip"))
     run_dir.mkdir(parents=True, exist_ok=True)
-    metrics_path = run_dir / "metrics.jsonl"
-    manifest_path = run_dir / "manifest.json"
 
-    sink = JsonlSink(metrics_path, seed=seed)
-    csv_sink = CsvSink(run_dir / "metrics.csv")
-    plot = PlotAdapter(run_dir, enable_plots=bool(train_cfg.get("enable_plots", False)))
+    _print_startup_summary(
+        dataset_name=dataset.name,
+        dims=dims,
+        loss=loss_name,
+        metrics=metrics_list,
+        strategy=str(model_cfg.get("strategy", "flip")),
+        ternary_mode=ternary_mode,
+        param_count=sum(dims[i] * dims[i + 1] for i in range(len(dims) - 1)),
+    )
+
+    train_jsonl = JsonlSink(run_dir / "metrics_train.jsonl", split="train", seed=seed)
+    train_csv = CsvSink(run_dir / "metrics_train.csv", split="train")
+    val_jsonl = JsonlSink(run_dir / "metrics_val.jsonl", split="val", seed=seed)
+    val_csv = CsvSink(run_dir / "metrics_val.csv", split="val")
+    test_jsonl = JsonlSink(run_dir / "metrics_test.jsonl", split="test", seed=seed)
+    test_csv = CsvSink(run_dir / "metrics_test.csv", split="test")
+
+    capture_train = _MetricsCapture()
+    capture_val = _MetricsCapture()
+    capture_test = _MetricsCapture()
 
     model = FeedForwardModel(
         layer_dims=dims,
@@ -267,32 +359,94 @@ def _train_single(config: Mapping[str, object]) -> RunResult:
         model=model,
         strategy=strategy,
         optimizer=optimizer,
-        callbacks=[sink, csv_sink, plot],
+        callbacks=[],
     )
+
+    split_loggers = {
+        "train": [train_jsonl, train_csv, capture_train],
+        "val": [val_jsonl, val_csv, capture_val],
+        "test": [test_jsonl, test_csv, capture_test],
+    }
 
     result = trainer.run(
-        data_iter,
-        epochs=epochs,
+        train_loader,
+        epochs=int(train_cfg.get("epochs", 1)),
         seed=seed,
         steps_per_epoch=steps_per_epoch,
+        val_loader=val_loader,
+        test_loader=test_loader,
+        val_steps=val_steps,
+        test_steps=test_steps,
+        task_type=data_spec.task_type,
+        num_classes=data_spec.num_classes,
+        loss=loss_name,
+        metric_names=metrics_list,
+        eval_every=eval_every,
+        split_loggers=split_loggers,
+        ternary_mode=ternary_mode,
+        early_stopping_patience=early_stopping,
+        checkpoint_dir=run_dir,
     )
-    plot.close()
+
+    test_metrics_final = capture_test.last or {}
+    (run_dir / "metrics_test.json").write_text(json.dumps(test_metrics_final, indent=2))
 
     manifest = write_manifest(
-        manifest_path,
+        run_dir / "manifest.json",
         config=_safe_config(config, hidden_dims),
         dataset_provenance=dataset.provenance,
     )
     summary_tail = int(train_cfg.get("summary_tail", 32))
     summary_path = write_summary(
-        metrics_path, run_dir / "summary.json", tail=summary_tail
+        train_jsonl.path, run_dir / "summary.json", tail=summary_tail
     )
+
+    config_path = run_dir / "config.json"
+    config_path.write_text(json.dumps(_safe_config(config, hidden_dims), indent=2))
+
+    metrics_alias = run_dir / "metrics.jsonl"
+    if train_jsonl.path.exists():
+        metrics_alias.write_text(train_jsonl.path.read_text())
+    csv_alias = run_dir / "metrics.csv"
+    train_csv_path = run_dir / "metrics_train.csv"
+    if train_csv_path.exists():
+        csv_alias.write_text(train_csv_path.read_text())
+
     return RunResult(
         steps=result.steps,
-        metrics_path=str(metrics_path),
+        metrics_path=str(train_jsonl.path),
         manifest_path=manifest,
         summary_path=str(summary_path),
     )
+
+
+def _resolve_run_dir(train_cfg: Mapping[str, object], dataset: str, strategy: str) -> Path:
+    if "run_dir" in train_cfg:
+        return Path(train_cfg["run_dir"])
+    timestamp = time.strftime("%Y%m%d-%H%M%S")
+    return Path("runs") / timestamp / dataset / strategy
+
+
+def _resolve_steps(
+    split_sizes: Mapping[str, int],
+    batch_size: int,
+    train_cfg: Mapping[str, object],
+) -> tuple[int, int, int]:
+    if "steps_per_epoch" in train_cfg:
+        train_steps = int(train_cfg["steps_per_epoch"])
+    else:
+        train_steps = max(1, math.ceil(split_sizes.get("train", 1) / batch_size))
+    val_steps = (
+        max(1, math.ceil(split_sizes.get("val", 0) / batch_size))
+        if split_sizes.get("val", 0)
+        else 0
+    )
+    test_steps = (
+        max(1, math.ceil(split_sizes.get("test", 0) / batch_size))
+        if split_sizes.get("test", 0)
+        else 0
+    )
+    return train_steps, val_steps, test_steps
 
 
 def _build_hidden(config: Mapping[str, object], depth: int | None = None) -> List[int]:
@@ -318,6 +472,11 @@ def _build_strategy(model_cfg: Mapping[str, object], dims: Sequence[int], seed: 
         return FlipTernary(refresh=refresh)
     if name == "dfa":
         return DFA(rng)
+    if name == "ternary_dfa":
+        threshold = float(model_cfg.get("feedback_threshold", model_cfg.get("tau", 0.05)))
+        return TernaryDFA(rng, threshold=threshold)
+    if name == "backprop":
+        return Backprop()
     if name == "structured":
         structure_type = model_cfg.get("structure_type")
         if structure_type is None:
@@ -337,19 +496,6 @@ def _build_strategy(model_cfg: Mapping[str, object], dims: Sequence[int], seed: 
     raise ValueError(f"Unknown strategy: {name}")
 
 
-def _resolve_schedule(train_cfg: Mapping[str, object]) -> tuple[int, int]:
-    if "epochs" in train_cfg:
-        epochs = int(train_cfg["epochs"])
-        steps_per_epoch = int(train_cfg.get("steps_per_epoch", 1))
-        return epochs, steps_per_epoch
-    if "steps" in train_cfg:
-        total_steps = int(train_cfg["steps"])
-        steps_per_epoch = int(train_cfg.get("steps_per_epoch", total_steps))
-        epochs = math.ceil(total_steps / max(1, steps_per_epoch))
-        return epochs, steps_per_epoch
-    return 1, int(train_cfg.get("steps_per_epoch", 1))
-
-
 def _safe_config(
     config: Mapping[str, object], hidden_dims: Iterable[int]
 ) -> Mapping[str, object]:
@@ -358,11 +504,35 @@ def _safe_config(
     return copied
 
 
+def _print_startup_summary(
+    *,
+    dataset_name: str,
+    dims: Sequence[int],
+    loss: str,
+    metrics: str,
+    strategy: str,
+    ternary_mode: str,
+    param_count: int,
+) -> None:
+    print("=== FeedFlipNets run ===")
+    print(f"Dataset       : {dataset_name}")
+    print(f"Dimensions    : {dims}")
+    print(f"Loss          : {loss}")
+    print(f"Metrics       : {metrics}")
+    print(f"Feedback      : {strategy}")
+    print(f"Ternary mode  : {ternary_mode}")
+    print(f"Parameters    : {param_count}")
+    print("========================")
+
+
 class _IterableLoader:
-    """Wrap a factory into a re-iterable loader."""
+    """Legacy compatibility wrapper retained for completeness."""
 
     def __init__(self, factory: Callable[[], Iterable]):
         self._factory = factory
 
     def __iter__(self):
         return iter(self._factory())
+
+
+__all__ = ["run_pipeline", "load_preset", "presets"]
