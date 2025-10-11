@@ -43,6 +43,27 @@ resolved configuration, including the offline flag, to the pipeline. When
 `FEEDFLIP_DATA_OFFLINE=1` (default) no network calls are attempted; fixtures are
 generated locally via the cache manifest.
 
+### Datasets & offline fixtures
+
+FeedFlipNets exposes a unified dataset registry via `feedflipnets.data`. The
+built-in loaders cover MNIST, UCR/UEA time-series (defaulting to GunPoint), the
+California Housing regression task, 20 Newsgroups text classification, and
+generic CSV regression/classification adapters. Every loader supports
+deterministic `train`/`val`/`test` splits, `seed` overrides, and an offline mode
+powered by deterministic synthetic fixtures (CSV helpers ship text fixtures in
+`feedflipnets/data/_fixtures/`). To explore a dataset without touching presets:
+
+```bash
+python -m cli.main --dataset mnist --offline --val-split 0.05 --test-split 0.1
+python -m cli.main --dataset ucr --ucr-name GunPoint --seed 123
+python -m cli.main --dataset csv_regression --csv-path feedflipnets/data/_fixtures/csv_regression_fixture.csv
+```
+
+Set `FFN_CACHE_DIR=...` to control the download cache location and
+`FFN_DATA_OFFLINE=0` to allow network fetches for the real datasets. The helper
+script `scripts/smoke_datasets.sh` runs a fast offline sanity check across all
+registered datasets.
+
 ### Run an experiment from the registry
 
 ```bash

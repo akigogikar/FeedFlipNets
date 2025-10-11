@@ -10,7 +10,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Iterable, Mapping, MutableMapping
 
-DEFAULT_CACHE_DIR = Path(os.environ.get("FEEDFLIP_CACHE_DIR", ".cache/feedflip"))
+DEFAULT_CACHE_DIR = Path(
+    os.environ.get("FFN_CACHE_DIR")
+    or os.environ.get("FEEDFLIP_CACHE_DIR")
+    or Path.home() / ".cache" / "feedflipnets"
+)
 MANIFEST_NAME = "manifest.json"
 
 
@@ -76,11 +80,10 @@ def fetch(
 
     cache_dir = Path(cache_dir or DEFAULT_CACHE_DIR)
     manifest = manifest or CacheManifest(cache_dir)
-    offline_mode = (
-        offline
-        if offline is not None
-        else os.environ.get("FEEDFLIP_DATA_OFFLINE", "1") == "1"
-    )
+    offline_env = os.environ.get("FFN_DATA_OFFLINE")
+    if offline_env is None:
+        offline_env = os.environ.get("FEEDFLIP_DATA_OFFLINE")
+    offline_mode = offline if offline is not None else str(offline_env or "1") == "1"
 
     if offline_mode:
         if offline_path is None:

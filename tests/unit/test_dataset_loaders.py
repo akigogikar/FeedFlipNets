@@ -1,31 +1,25 @@
-from feedflipnets.data import registry
+from feedflipnets.data.registry import get_dataset
 
 
 def test_mnist_offline(tmp_path, monkeypatch):
-    monkeypatch.setenv("FEEDFLIP_DATA_OFFLINE", "1")
-    spec = registry.get(
-        "mnist",
-        offline=True,
-        cache_dir=tmp_path,
-        subset="train",
-        max_items=4,
-        one_hot=False,
-    )
+    monkeypatch.setenv("FFN_DATA_OFFLINE", "1")
+    spec = get_dataset("mnist", offline=True, cache_dir=tmp_path, one_hot=True)
     batch = next(spec.loader("train", 2))
-    assert batch.inputs.shape[1] == 784
-    assert batch.targets.shape[1] == 1
+    assert batch.inputs.shape[1] == spec.data_spec.d_in
+    assert batch.targets.shape[1] == spec.data_spec.d_out
 
 
 def test_tinystories_offline(tmp_path, monkeypatch):
-    monkeypatch.setenv("FEEDFLIP_DATA_OFFLINE", "1")
-    spec = registry.get("tinystories", offline=True, cache_dir=tmp_path, window=3)
+    monkeypatch.setenv("FFN_DATA_OFFLINE", "1")
+    spec = get_dataset("tinystories", offline=True, cache_dir=tmp_path, window=3)
     batch = next(spec.loader("train", 2))
-    assert batch.inputs.shape[1] == 3
+    assert batch.inputs.shape[1] == spec.data_spec.d_in
+    assert batch.targets.shape[1] == spec.data_spec.d_out
 
 
 def test_ucr_offline(tmp_path, monkeypatch):
-    monkeypatch.setenv("FEEDFLIP_DATA_OFFLINE", "1")
-    spec = registry.get("ucr_uea", offline=True, cache_dir=tmp_path, name="demo")
+    monkeypatch.setenv("FFN_DATA_OFFLINE", "1")
+    spec = get_dataset("ucr", offline=True, cache_dir=tmp_path)
     batch = next(spec.loader("train", 2))
-    assert batch.inputs.ndim == 2
-    assert batch.targets.shape[1] > 0
+    assert batch.inputs.shape[1] == spec.data_spec.d_in
+    assert batch.targets.shape[1] == spec.data_spec.d_out

@@ -2,8 +2,14 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import sys
 from pathlib import Path
 from statistics import mean, pstdev
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from feedflipnets.core.np_mlp import train_one
 
 STRATS = ["bp", "dfa", "flip"]

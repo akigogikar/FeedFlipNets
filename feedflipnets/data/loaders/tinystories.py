@@ -9,7 +9,8 @@ import numpy as np
 
 from ...core.types import Batch
 from ..cache import fetch
-from ..registry import DatasetSpec, register_dataset
+from ..registry import DataSpec, DatasetSpec, register_dataset
+from ..utils import batch_iterator, deterministic_split, resolve_cache_dir
 
 _URL = "https://huggingface.co/datasets/roneneldan/TinyStories"
 _CHECKSUM = "a78da77ff36f30c5e6a4467348b5f683afde3787e243be00b9340c306c8ad3fc"
@@ -52,7 +53,7 @@ def _factory(
     cache_dir: str | Path | None = None,
     **_: object,
 ) -> DatasetSpec:
-    base_cache = Path(cache_dir) if cache_dir is not None else Path(".cache/feedflip")
+    base_cache = resolve_cache_dir(cache_dir)
     offline_path = base_cache / "offline" / "tinystories_fixture.npy"
     path, provenance = fetch(
         name="tinystories",
@@ -77,22 +78,31 @@ def _factory(
     X = np.stack(sequences, axis=0)
     y = np.array(targets, dtype=np.float32).reshape(-1, 1)
 
+    splits = deterministic_split(X.shape[0], val_split=0.1, test_split=0.2, seed=seed)
+
     def loader(split: str, batch_size: int) -> Iterator[Batch]:
-        if split not in {"train", "test"}:
+        if split not in {"train", "val", "test"}:
             raise ValueError(f"Unsupported split: {split}")
-        rng = np.random.default_rng(seed if split == "train" else seed + 1)
-        n = X.shape[0]
-        while True:
-            idx = rng.integers(0, n, size=batch_size)
-            yield Batch(inputs=X[idx], targets=y[idx])
+        indices = getattr(splits, split)
+        split_seed = seed + {"train": 0, "val": 1, "test": 2}[split]
+        return batch_iterator(X, y, indices, batch_size=batch_size, seed=split_seed)
 
     provenance = dict(provenance)
     provenance.update({"window": window, "vocab_size": len(vocab)})
+
+    data_spec = DataSpec(
+        d_in=int(X.shape[1]),
+        d_out=int(y.shape[1]),
+        task_type="regression",
+        normalization={},
+    )
+
     return DatasetSpec(
         name="tinystories",
-        provenance=provenance,
         loader=loader,
-        checksum=provenance.get("checksum"),
+        data_spec=data_spec,
+        provenance=provenance,
+        splits={k: int(v) for k, v in splits.sizes.items()},
     )
 
 
