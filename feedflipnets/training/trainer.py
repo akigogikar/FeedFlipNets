@@ -202,9 +202,7 @@ class Trainer:
             resolved_schedule = (flip_schedule or "per_step").lower()
 
         if resolved_schedule not in {"off", "per_step", "per_epoch"}:
-            raise ValueError(
-                "flip_schedule must be one of {'off','per_step','per_epoch'}"
-            )
+            raise ValueError("flip_schedule must be one of {'off','per_step','per_epoch'}")
 
         flip_enabled = flip != "off"
 
