@@ -13,7 +13,6 @@ import numpy as np
 
 from ..core.types import Batch
 
-
 DEFAULT_CACHE_SUBDIR = Path.home() / ".cache" / "feedflipnets"
 
 
@@ -53,7 +52,11 @@ class SplitIndices:
 
     @property
     def sizes(self) -> Mapping[str, int]:
-        return {"train": int(self.train.size), "val": int(self.val.size), "test": int(self.test.size)}
+        return {
+            "train": int(self.train.size),
+            "val": int(self.val.size),
+            "test": int(self.test.size),
+        }
 
 
 def deterministic_split(
@@ -145,7 +148,9 @@ def standardize(
     return scaled.astype(np.float32), mean.astype(np.float32), std.astype(np.float32)
 
 
-def identity_batches(features: np.ndarray, targets: np.ndarray, split: str, batch_size: int) -> Iterator[Batch]:
+def identity_batches(
+    features: np.ndarray, targets: np.ndarray, split: str, batch_size: int
+) -> Iterator[Batch]:
     if split not in {"train", "val", "test"}:
         raise ValueError(f"Unknown split: {split}")
     # Deterministic sequential batches (no sampling) used for fixtures/tests.

@@ -10,7 +10,7 @@ import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 
 from ..core.types import Batch
-from .registry import DataSpec, DatasetSpec, register_dataset
+from .registry import DatasetSpec, DataSpec, register_dataset
 from .utils import batch_iterator, deterministic_split, standardize
 
 FIXTURE_DIR = Path(__file__).resolve().parent / "_fixtures"
@@ -113,7 +113,9 @@ def load_csv_classification(
 ) -> DatasetSpec:
     """Load a classification dataset from a CSV file."""
 
-    path = Path(csv_path) if csv_path else _default_path("csv_classification_fixture.csv")
+    path = (
+        Path(csv_path) if csv_path else _default_path("csv_classification_fixture.csv")
+    )
     X, y_raw = _load_csv(path, target_col)
     X = X.astype(np.float32)
     encoder = LabelEncoder()

@@ -9,7 +9,7 @@ import numpy as np
 
 from ..core.types import Batch
 from .cache import fetch
-from .registry import DataSpec, DatasetSpec, register_dataset
+from .registry import DatasetSpec, DataSpec, register_dataset
 from .utils import batch_iterator, deterministic_split, resolve_cache_dir
 
 MNIST_URL = "https://storage.googleapis.com/tf-keras-datasets/mnist.npz"
@@ -35,7 +35,9 @@ def _prepare_inputs(images: np.ndarray) -> np.ndarray:
     return images.astype(np.float32)
 
 
-def _prepare_targets(labels: np.ndarray, *, one_hot: bool, num_classes: int) -> np.ndarray:
+def _prepare_targets(
+    labels: np.ndarray, *, one_hot: bool, num_classes: int
+) -> np.ndarray:
     labels = labels.astype(np.int64)
     if one_hot:
         eye = np.eye(num_classes, dtype=np.float32)
@@ -44,13 +46,37 @@ def _prepare_targets(labels: np.ndarray, *, one_hot: bool, num_classes: int) -> 
 
 
 def _offline_dataset() -> tuple[np.ndarray, np.ndarray]:
-    """Return a deterministic synthetic MNIST-like dataset."""
+    """Return a deterministic, linearly-separable MNIST-style dataset."""
 
     rng = np.random.default_rng(12345)
-    num_samples = 256
-    images = rng.integers(0, 256, size=(num_samples, 28, 28), dtype=np.uint8)
-    labels = rng.integers(0, 10, size=(num_samples,), dtype=np.int64)
-    return images.astype(np.float32), labels
+    num_classes = 10
+    samples_per_class = 64
+    height, width = 28, 28
+    flat_dim = height * width
+    segment = max(1, flat_dim // num_classes)
+
+    images: list[np.ndarray] = []
+    labels: list[int] = []
+
+    for cls in range(num_classes):
+        base = np.zeros(flat_dim, dtype=np.float32)
+        start = cls * segment
+        end = start + segment
+        if end <= flat_dim:
+            base[start:end] = 1.0
+        else:
+            base[start:] = 1.0
+            base[: end - flat_dim] = 1.0
+
+        for _ in range(samples_per_class):
+            noise = rng.normal(loc=0.0, scale=0.05, size=flat_dim).astype(np.float32)
+            sample = np.clip(base + noise, 0.0, 1.0)
+            images.append(sample.reshape(height, width))
+            labels.append(cls)
+
+    images_arr = np.stack(images, axis=0)
+    labels_arr = np.asarray(labels, dtype=np.int64)
+    return images_arr, labels_arr
 
 
 @register_dataset("mnist")
@@ -109,12 +135,14 @@ def build_mnist(
     )
 
     provenance = dict(provenance)
-    provenance.update({
-        "val_split": val_split,
-        "test_split": test_split,
-        "seed": seed,
-        "one_hot": one_hot,
-    })
+    provenance.update(
+        {
+            "val_split": val_split,
+            "test_split": test_split,
+            "seed": seed,
+            "one_hot": one_hot,
+        }
+    )
 
     split_sizes = splits.sizes
 

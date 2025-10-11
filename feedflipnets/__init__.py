@@ -1,11 +1,12 @@
 """FeedFlipNets public API."""
 
-from .core import activations, quant, strategies, types  # noqa: F401
-from .core import quant as quantization  # Backwards compatible alias
-from .core import strategies as feedback  # Backwards compatible alias
+from .core import activations  # noqa: F401
+from .core import quant  # Backwards compatible alias
+from .core import strategies  # Backwards compatible alias
+from .core import types  # noqa: F401
+from .train import sweep_and_log, train_single
 from .training.pipelines import load_preset, presets, run_pipeline
 from .training.trainer import Trainer
-from .train import sweep_and_log, train_single
 from .utils import make_dataset
 
 __all__ = [

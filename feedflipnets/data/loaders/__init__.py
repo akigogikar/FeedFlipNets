@@ -4,12 +4,6 @@ This module exists for backwards compatibility. Importing it ensures that legacy
 dataset registrations remain available.
 """
 
-from . import (  # noqa: F401
-    mnist,
-    synth_fixture,
-    synthetic,
-    tinystories,
-    ucr_uea,
-)
+from . import mnist, synth_fixture, synthetic, tinystories, ucr_uea  # noqa: F401
 
 __all__ = ["mnist", "synth_fixture", "synthetic", "tinystories", "ucr_uea"]

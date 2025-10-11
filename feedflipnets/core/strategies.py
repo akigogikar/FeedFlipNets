@@ -7,8 +7,8 @@ from typing import Dict, List, Protocol, Sequence, Tuple
 
 import numpy as np
 
-from .types import ActivationState, Array, Gradients, ModelDescription, StrategyState
 from .quant import quantize_ternary_det
+from .types import ActivationState, Array, Gradients, ModelDescription, StrategyState
 
 
 class FeedbackStrategy(Protocol):
@@ -97,8 +97,9 @@ class DFA:
         grads[f"W{last_idx}"] = layer_inputs[last_idx].T @ delta / batch
         for idx in reversed(range(last_idx)):
             feedback = feedback_mats[idx]
-            delta = (delta @ feedback) * layer_derivs[idx]
-            grads[f"W{idx}"] = layer_inputs[idx].T @ delta / batch
+            projected = error @ feedback
+            delta_layer = projected * layer_derivs[idx]
+            grads[f"W{idx}"] = layer_inputs[idx].T @ delta_layer / batch
         return grads, state
 
 
@@ -116,7 +117,8 @@ class TernaryDFA:
         for hidden_dim in dims[1:-1]:
             scale = 1.0 / np.sqrt(output_dim)
             matrix = (
-                self.rng.standard_normal((output_dim, hidden_dim)).astype(np.float32) * scale
+                self.rng.standard_normal((output_dim, hidden_dim)).astype(np.float32)
+                * scale
             )
             matrices.append(quantize_ternary_det(matrix, self.threshold))
         return _SimpleState(feedback=matrices)
@@ -139,8 +141,9 @@ class TernaryDFA:
         grads[f"W{last_idx}"] = layer_inputs[last_idx].T @ delta / batch
         for idx in reversed(range(last_idx)):
             matrix = feedback[idx]
-            delta = (delta @ matrix) * layer_derivs[idx]
-            grads[f"W{idx}"] = layer_inputs[idx].T @ delta / batch
+            projected = error @ matrix
+            delta_layer = projected * layer_derivs[idx]
+            grads[f"W{idx}"] = layer_inputs[idx].T @ delta_layer / batch
         return grads, state
 
 

@@ -9,7 +9,7 @@ import numpy as np
 
 from ...core.types import Batch
 from ..cache import fetch
-from ..registry import DataSpec, DatasetSpec, register_dataset
+from ..registry import DatasetSpec, DataSpec, register_dataset
 from ..utils import batch_iterator, deterministic_split, resolve_cache_dir
 
 _URL = "https://huggingface.co/datasets/roneneldan/TinyStories"

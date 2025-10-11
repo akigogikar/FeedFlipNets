@@ -33,7 +33,14 @@ def _sigmoid(x: Array) -> Array:
     return 1.0 / (1.0 + np.exp(-x))
 
 
-def compute_metric(name: str, predictions: Array, targets: Array, *, task_type: str, num_classes: int | None = None) -> MetricResult:
+def compute_metric(
+    name: str,
+    predictions: Array,
+    targets: Array,
+    *,
+    task_type: str,
+    num_classes: int | None = None,
+) -> MetricResult:
     key = name.lower()
     preds = predictions
     targs = targets
@@ -107,7 +114,9 @@ def compute_metrics(
 ) -> Mapping[str, float]:
     results: Dict[str, float] = {}
     for name in names:
-        metric = compute_metric(name, predictions, targets, task_type=task_type, num_classes=num_classes)
+        metric = compute_metric(
+            name, predictions, targets, task_type=task_type, num_classes=num_classes
+        )
         results[metric.name] = metric.value
     return results
 

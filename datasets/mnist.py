@@ -9,7 +9,6 @@ import numpy as np
 
 from .utils import normalize
 
-
 _DEF_PATH = os.path.join("datasets_cache", "mnist.npz")
 
 

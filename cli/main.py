@@ -228,7 +228,9 @@ def main(argv: Iterable[str] | None = None) -> None:
     if args.eval_every is not None:
         config.setdefault("train", {})["eval_every"] = args.eval_every
     if args.early_stopping_patience is not None:
-        config.setdefault("train", {})["early_stopping_patience"] = args.early_stopping_patience
+        config.setdefault("train", {})[
+            "early_stopping_patience"
+        ] = args.early_stopping_patience
 
     config["offline"] = bool(args.offline)
 

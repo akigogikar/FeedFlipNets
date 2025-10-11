@@ -10,7 +10,6 @@ import numpy as np
 
 from ..core.types import Batch
 
-
 TaskType = "regression", "multiclass", "binary", "multilabel"
 
 
@@ -94,7 +93,9 @@ def register_dataset(
     if factory is not None:
         return _decorator(factory)
     if name is None:
-        raise TypeError("register_dataset requires a name when used without a decorator")
+        raise TypeError(
+            "register_dataset requires a name when used without a decorator"
+        )
     return _decorator
 
 
@@ -132,7 +133,12 @@ def available_datasets() -> Iterable[str]:
 
 
 def _validate_spec(spec: DatasetSpec) -> None:
-    if spec.data_spec.task_type not in {"regression", "multiclass", "binary", "multilabel"}:
+    if spec.data_spec.task_type not in {
+        "regression",
+        "multiclass",
+        "binary",
+        "multilabel",
+    }:
         raise ValueError(f"Invalid task type: {spec.data_spec.task_type}")
     if spec.data_spec.task_type == "multiclass" and spec.data_spec.num_classes is None:
         raise ValueError("Multiclass datasets must define num_classes")
@@ -143,7 +149,7 @@ def _validate_spec(spec: DatasetSpec) -> None:
             raise ValueError(f"Split {split!r} has negative sample count {count}")
 
 
-# Backwards compatibility -----------------------------------------------------------------
+# Backwards compatibility --------------------------------------------------------------
 
 
 def get(
